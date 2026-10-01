@@ -1,0 +1,38 @@
+# SokkerLiga — Caddy site block.
+#
+# Install to /etc/caddy/sites/sokkerliga.caddy; the main Caddyfile (in the
+# conforza-home repo) imports it and defines the conforza_auth and
+# conforza_headers snippets used here. Then: systemctl reload caddy
+
+sokkerliga.conforza.tech {
+	encode zstd gzip
+
+	# The health probe is open, so a deploy can be verified without an account.
+	handle /api/health {
+		reverse_proxy 127.0.0.1:8789
+	}
+
+	# Everything else needs a front-door sign-in with access to SokkerLiga.
+	handle {
+		import conforza_auth sokkerliga
+
+		handle /api/* {
+			reverse_proxy 127.0.0.1:8789
+		}
+
+		handle {
+			root * /srv/sokkerliga/dist
+			try_files {path} /index.html
+			file_server
+		}
+	}
+
+	import conforza_headers
+
+	log {
+		output file /var/log/caddy/sokkerliga.log {
+			roll_size 10MiB
+			roll_keep 5
+		}
+	}
+}

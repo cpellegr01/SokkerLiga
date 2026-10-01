@@ -1,0 +1,39 @@
+# SokkerLiga API — systemd unit.
+#
+# Install to /etc/systemd/system/sokkerliga.service
+#
+# Runs only the API. The built front end is static files served by Caddy.
+
+[Unit]
+Description=SokkerLiga API
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=sokkerliga
+Group=sokkerliga
+WorkingDirectory=/srv/sokkerliga
+ExecStart=/usr/bin/node --disable-warning=ExperimentalWarning server/index.mjs
+
+Restart=on-failure
+RestartSec=5
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+Environment=NODE_ENV=production
+Environment=PORT=8789
+# Loopback only. This is what makes the X-Conforza-User-* headers
+# trustworthy: only Caddy, after asking the front door, can reach this port.
+Environment=HOST=127.0.0.1
+Environment=SOKKERLIGA_DB=/var/lib/sokkerliga/sokkerliga.db
+Environment=CONFORZA_URL=https://conforza.tech
+
+ReadWritePaths=/var/lib/sokkerliga
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target
