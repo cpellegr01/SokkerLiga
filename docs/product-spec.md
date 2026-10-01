@@ -4,6 +4,19 @@ As given by Claudio on 2026-10-01. Recorded here in condensed form; every
 requirement of the original is kept. The design that answers it is in
 `docs/architecture.md`.
 
+## Scope decisions (2026-10-01) — these override the sections below
+
+1. **Stack**: same as SAM (SQLite), not Next.js/PostgreSQL.
+2. **No odds feed**: football data only.
+3. **Recommendations, not betting**: SokkerLiga never places bets; Claudio
+   bets in a separate betting app. **Afterwards Claudio records the bet in
+   SokkerLiga by hand** (match, market, selection, odds taken, stake, notes).
+   SokkerLiga settles recorded bets from the results and keeps the Betting
+   History. Bankroll tools are optional and come last.
+
+The original odds section is kept below for reference only; the bet
+sections still apply, with odds typed in by hand.
+
 ## Purpose
 
 A personal soccer prediction, analytics and betting **decision-support**
