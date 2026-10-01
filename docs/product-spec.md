@@ -75,6 +75,10 @@ shots and shots on target (when data exists).
 
 ## Odds
 
+**Changed 2026-10-01: no odds feed.** Claudio needs football data only; odds
+are entered by hand (bet slip, or a price to evaluate). The original
+requirement follows for reference.
+
 An odds-provider interface importing sportsbook odds where legally and
 technically available. Odds stored as **historical snapshots**, enabling:
 opening, current and closing odds, line movement, implied probability, best

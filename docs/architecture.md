@@ -1,7 +1,13 @@
 # SokkerLiga — architecture
 
 Design for `docs/product-spec.md`. Written 2026-10-01, before any application
-code. Stack: Node 22, Vite, React, SQLite via `node:sqlite`, plain JavaScript —
+code.
+
+**No odds feed** (Claudio, 2026-10-01): SokkerLiga subscribes to football
+data only. Odds enter the system only when Claudio types them — on the bet
+slip, or as a price to evaluate on a match's Analysis tab. Everything below
+reflects that; an odds provider can be added later through the same provider
+interface without schema changes. Stack: Node 22, Vite, React, SQLite via `node:sqlite`, plain JavaScript —
 the same as SAM, by Claudio's decision.
 
 Contents
@@ -74,7 +80,7 @@ server/
   schema.sql             all tables, indexes, views, immutability triggers
   seed/*.json            master data: competitions, markets, statuses, …
   providers/             one module per source, all implementing §3
-    api-football.mjs  the-odds-api.mjs  football-data-uk.mjs
+    api-football.mjs  football-data-uk.mjs
   ingest/                provider payload → normalised rows (idempotent)
   features/              as-of feature builder (no look-ahead)
   models/                probability engines (Dixon–Coles, rate models, …)
@@ -181,8 +187,7 @@ precedent), so no charting library is needed.
 | `market_types` | `key` (match_result, draw_no_bet, double_chance, over_under, btts, asian_handicap, european_handicap, team_total, corners_ou, cards_ou, anytime_scorer, player_shots, player_sot), `name`, `has_line`, `settles_on` (goals/corners/cards/player_stat), `period` (FT/1H) |
 | `markets` | `id`, `match_id`, `market_type_key`, `line` (2.5, −0.75…), `team_id`, `player_id` — unique per combination |
 | `selections` | `id`, `market_id`, `key` (home/draw/away/over/under/yes/no) |
-| `odds_snapshots` | `id`, `selection_id`, `bookmaker_key`, `price` (decimal), `captured_at`, `source_key`, `is_closing` — **append-only; a row is written only when the price changed** from that bookmaker's previous snapshot |
-| `odds_summary` | view: opening, latest, closing, best price, consensus (de-vigged median) per selection |
+| `odds_snapshots` | `id`, `selection_id`, `bookmaker_key`, `price` (decimal), `captured_at`, `source_key` (`manual` for now), `is_closing` — **append-only**. Today every row is a price Claudio entered; a future odds feed would write here too |
 
 ### Predictions and AI (all append-only)
 
@@ -258,17 +263,10 @@ export default {
   async squad(ctx, { teamRef, seasonRef }) {},
   async injuries(ctx, { competitionRef, seasonRef, date }) {},
 };
-
-// Odds providers
-export default {
-  key: 'the-odds-api',
-  kind: 'odds',
-  capabilities: ['odds_current', 'odds_historical'],
-  async markets(ctx) {},                     // which competitions/markets exist
-  async odds(ctx, { competitionRef, markets, regions }) {},
-  async historicalOdds(ctx, { competitionRef, at }) {},
-};
 ```
+
+An odds provider would be a module with `kind: 'odds'` and an `odds()` method
+writing to `odds_snapshots`. None is planned.
 
 `ctx` gives the provider an HTTP client that records every response into
 `raw_payloads`, counts quota, applies the rate limit, and retries with
@@ -287,17 +285,17 @@ matched automatically. No fuzzy match is applied silently.
 | Source | Role | Cost | Notes |
 |---|---|---|---|
 | **API-Football** (api-sports.io) | Primary stats provider: competitions, fixtures, results, events, lineups, team and player match stats, injuries, squads, standings, logos and photos | **Pro $19/mo**, 7,500 requests/day (free tier: 100/day, past seasons only) | Covers all 8 competitions. xG appears in fixture statistics for some competitions only; treat as optional and record when absent. Images are served by the provider; display, don't redistribute. |
-| **The Odds API** | Odds snapshots from many bookmakers (US, UK, EU incl. Pinnacle and Betfair), 1X2, totals, spreads, some player props; historical snapshots back to 2020 | **$30/mo** for 20k credits; $59 for 100k | Credits = markets × regions per call, so polling is scheduled by kickoff proximity (§5). Pinnacle is the reference for closing-line value. |
-| **football-data.co.uk** | Historical results, basic match stats and closing odds (Pinnacle from 2012/13) for backtesting and calibrating the statistical model | Free | **Free for private individuals only.** Its terms also exclude "data training products using automated bots/scrapers/AI": files are downloaded by hand and imported, used only to fit and evaluate the statistical model, and **never sent to Claude**. Claudio to confirm he is comfortable with that reading before Phase 2. |
+| **football-data.co.uk** | Historical results and basic match stats (since 1993 and 2000) for fitting and backtesting the statistical model; its odds columns are ignored | Free | **Free for private individuals only.** Its terms also exclude "data training products using automated bots/scrapers/AI": files are downloaded by hand and imported, used only to fit and evaluate the statistical model, and **never sent to Claude**. Claudio to confirm that reading is acceptable before Phase 2. |
 | Sportmonks (alternative) | Richer xG and pressure metrics | €29+/mo plus €24 xG add-on | Not needed at first. Worth adding as a second stats provider if xG coverage from API-Football proves thin. |
 | Anthropic API | Claude for explanations | Usage-based | One call per Analyze Match. Cost and tokens logged per run. |
+| ~~The Odds API~~ | Odds feed | — | **Not used** — Claudio needs football data only. |
 
 Deliberately **excluded**: scraping FBref, Understat, Transfermarkt,
 WhoScored or sportsbook websites. Their terms forbid it or the data is
 licensed from Opta; scrapers also break without warning. Opta/Stats Perform
 and Genius Sports are enterprise-priced.
 
-Starting budget: about **$49/month** plus Claude usage. The accounts must be
+Starting budget: **$19/month** plus Claude usage. The accounts must be
 opened by Claudio; keys go into `/etc/sokkerliga/sokkerliga.env`.
 
 ---
@@ -315,7 +313,6 @@ opened by Claudio; keys go into `/etc/sokkerliga/sokkerliga.env`.
 | `sync_lineups` | from 75 min before kickoff, every 10 min | probable → confirmed lineups |
 | `sync_results` | every 15 min while matches are live or just finished; final pass +6 h | result, events, team and player stats; sets `result_confirmed_at` |
 | `sync_standings` | after results, and daily | a new `as_of` standings row set |
-| `sync_odds` | ramped by kickoff: daily until 72 h, every 3 h until 24 h, hourly until 3 h, every 15 min until kickoff, then a **closing capture** at kickoff | odds snapshots (only changed prices stored) |
 | `settle_bets` | after each `sync_results` | auto-settlement (§7) |
 | `refit_models` | nightly | refit ratings using only finished matches |
 | `compute_performance` | nightly | `model_performance` snapshots |
@@ -364,7 +361,7 @@ query in it is filtered by `asOf`:
 - matches with `kickoff_utc < asOf` and results whose `result_confirmed_at <=
   asOf` (with revisions applied as of that time);
 - availability, rosters and standings valid at `asOf`;
-- odds with `captured_at <= asOf`;
+- manually entered prices with `captured_at <= asOf`;
 - model ratings fitted on matches before `asOf`.
 
 The live Analyze button uses `asOf = now`; backtests use `asOf = kickoff −
@@ -395,8 +392,9 @@ prevented where xG exists; set-piece share of goals; corners and cards rates
   shots and goals where xG is missing) × probability of playing × expected
   minutes, against the goals model's team expected goals. Shots and shots on
   target by the same rate approach. Offered only when data covers the player.
-- **Market benchmark**: de-vigged consensus odds are stored beside every
-  prediction, so the model is always compared to the market.
+- **Market benchmark**: when Claudio enters prices for every outcome of a
+  market, the bookmaker margin is removed and the fair probability stored
+  beside the model's.
 - **Calibration** (Phase 4): isotonic calibration per market family, fitted
   *only* on predictions settled before `asOf`. Raw and calibrated
   probabilities are both stored.
@@ -419,8 +417,8 @@ explain({ packet, probabilities, marketContext }) → {
 ```
 
 The Claude adapter sends a compact, structured **match-analysis packet**
-(typically 3–6k tokens): the feature snapshot, model probabilities, current
-prices, and the relevant history — never whole tables. Output is forced into
+(typically 3–6k tokens): the feature snapshot, model probabilities, any
+prices entered, and the relevant history — never whole tables. Output is forced into
 that JSON shape with tool use. Prompt text is stored in `prompts` with a
 version; every run records model name, prompt version and token cost.
 
@@ -431,7 +429,10 @@ remain the model's. Another LLM, or no LLM, is a different adapter.
 
 ### 5 — Recommendation
 
-For each selection with a price:
+Every analysis shows the model's probability and its **fair odds** (1 ÷ p)
+for each selection — "this is worth backing at 2.10 or better" — so a
+decision can be made against any bookmaker without an odds feed. When
+Claudio enters the price on offer, the recommendation is completed:
 
 ```
 implied        = 1 / decimal odds
@@ -456,7 +457,7 @@ analytics keep four measures apart:
 | Measure | Question | Metric |
 |---|---|---|
 | Prediction quality | Were the probabilities right? | Brier, log loss, calibration |
-| Price quality | Did we get a good number? | CLV vs Pinnacle close |
+| Price quality | Did we get a good number? | Price taken vs the model's fair odds (CLV only if an odds feed is ever added) |
 | Decision quality | Was it +EV when placed? | EV at bet time, threshold compliance |
 | Outcome | Did it win? | P/L — reported, never used to judge the others |
 
@@ -492,9 +493,9 @@ finalFacts)` with one rule set per market type, tested exhaustively:
 Settlement only runs once `result_confirmed_at` is set. Each result is
 written as a new `settlements` row (`source = auto`). A manual correction is
 another row (`source = manual`, reason required); nothing is overwritten,
-and both are visible. P/L is computed from the current settlement. At
-settlement, closing odds (the last pre-kickoff snapshot, Pinnacle where
-available) are attached and **CLV = odds taken ÷ closing odds − 1** stored.
+and both are visible. P/L is computed from the current settlement. Closing odds and CLV
+columns exist but stay empty without an odds feed; a closing price can be typed
+on a bet to get CLV for it.
 
 ---
 
@@ -534,15 +535,15 @@ collapse to cards).
 
 - **Dashboard**: today's matches, next 7 days, best current opportunities
   (Bet recommendations by EV), open bets and exposure, recently settled bets,
-  bankroll, P/L, ROI, recent Brier/calibration sparkline.
+  bankroll, P/L, ROI, recent Brier/calibration sparkline. "Best
+  opportunities" ranks by model edge over fair odds where a price was entered.
 - **Matches**: date strip + filters (competition, team, country, status,
   favourites first).
 - **Match Center**: header (crests, kickoff in local time, venue,
   competition, positions); tabs for *Overview* (form strips, home/away
   records, goals and xG bars), *Head-to-head*, *Lineups & availability*,
-  *Players* (key players, recent stats), *Odds* (current/best/consensus,
-  movement chart), *Analysis* (Analyze button, model probabilities beside
-  market probabilities, factors for/against, Bet/Pass cards with EV and
+  *Players* (key players, recent stats), *Analysis* (Analyze button, model probabilities and fair odds, optional
+  price entry to compute edge and EV, factors for/against, Bet/Pass cards with EV and
   stake advice, "Add to bet slip").
 - **Predictions**: every prediction with outcome, filters, and a link to its
   frozen feature snapshot.
@@ -553,7 +554,7 @@ collapse to cards).
   filters from the spec.
 - **Model Performance**: reliability diagram (predicted vs observed per
   bucket, with counts), Brier/log-loss trend, by market/competition/version,
-  CLV distribution, ROI of recommendations vs. passes.
+  ROI of recommendations vs. passes.
 - **Teams / Players / Leagues**: profiles as specified, with tracked betting
   performance on team pages.
 - **Settings**: competitions enabled, thresholds, bankroll and staking,
@@ -570,8 +571,7 @@ allow, with initials-badge fallbacks.
 Each phase ends deployed and verified at sokkerliga.conforza.tech.
 
 **Phase 0 — groundwork (small)**
-- Accounts and keys (Claudio): API-Football Pro, The Odds API (later, Phase
-  3), Anthropic key. Keys into `/etc/sokkerliga/sokkerliga.env`.
+- Accounts and keys (Claudio): API-Football Pro, Anthropic key. Keys into `/etc/sokkerliga/sokkerliga.env`.
 - Worker systemd unit `sokkerliga-worker`, backups cron.
 
 **Phase 1 — knowledge base and Match Center**
@@ -598,14 +598,14 @@ Each phase ends deployed and verified at sokkerliga.conforza.tech.
   tab.
 
 **Phase 3 — odds and bets**
-- The Odds API provider, ramped odds sync, change-only snapshots, closing
-  capture; odds conversions, de-vigging, consensus, movement.
+- Price entry (decimal, American, fractional), conversions, de-vigging of
+  entered prices.
 - Thresholds and Bet/Pass; bet slip (singles and parlays); settlement engine
   and manual corrections; P/L; My Bets; Betting History.
 
 **Phase 4 — evaluation and bankroll**
 - Model Performance (Brier, log loss, reliability diagrams, by segment and
-  version), CLV analytics, calibration layer, bankroll settings, ledger,
+  version), calibration layer, bankroll settings, ledger,
   staking advice, exposure.
 
 **Phase 5 — depth**
