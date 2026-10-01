@@ -33,4 +33,8 @@ check (`/api/health`) is open, everything else needs a front-door sign-in.
 
 ## Product
 
-Not yet defined — the app is a placeholder that proves sign-in end to end.
+A personal soccer prediction, analytics and betting decision-support app (it
+never places bets). Spec: `docs/product-spec.md`. Design — schema, providers,
+pipelines, settlement, routes, phased roadmap: `docs/architecture.md`. Read
+both before building. Claudio chose the SAM stack (SQLite) over the spec's
+Next.js/PostgreSQL preference; don't re-propose it.
