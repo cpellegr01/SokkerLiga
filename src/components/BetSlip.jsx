@@ -41,8 +41,8 @@ export function BetSlipProvider({ children }) {
     /** Load an existing bet to fix it. */
     edit(bet) {
       setDraft({
-        editingId: bet.id, stake: (bet.stakeMinor / 100).toFixed(2), fee: bet.feeMinor ? (bet.feeMinor / 100).toFixed(2) : '',
-        commission: bet.commissionMinor ? (bet.commissionMinor / 100).toFixed(2) : '',
+        editingId: bet.id, stake: (bet.stakeMinor / 100).toFixed(2),
+        fee: bet.feeMinor + bet.commissionMinor ? ((bet.feeMinor + bet.commissionMinor) / 100).toFixed(2) : '',
         byContracts: !!bet.contracts, contracts: bet.contracts ? String(bet.contracts) : '',
         limitPrice: bet.limitPrice ? String(Math.round(bet.limitPrice * 10000) / 100) : '', stakeAuto: false,
         sportsbook: bet.sportsbook.key,
@@ -114,8 +114,7 @@ function SlipDrawer() {
   const hasContracts = contracts > 0;
   const limit = contractMode ? parseContractPrice(draft.limitPrice) : null;
   const payout = hasContracts ? Math.round(contracts * 100) : total && stakeMinor ? Math.round(stakeMinor * total) : null;
-  const commissionMinor = contractMode ? parseMoney(draft.commission) ?? 0 : 0;
-  const feeMinor = (parseMoney(draft.fee) ?? 0) + commissionMinor;
+  const feeMinor = parseMoney(draft.fee) ?? 0;
   const contractCost = hasContracts && limit ? Math.round(contracts * limit * 100) : null;
   const fillCents = hasContracts && stakeMinor ? Number((stakeMinor / contracts).toFixed(2)) : null;
   useEffect(() => {
@@ -130,13 +129,22 @@ function SlipDrawer() {
   const limitMinor = plan ? Math.floor((plan.balanceMinor * plan.settings.maxExposurePct) / 100) : null;
   const overLimit = plan && stakeMinor && !draft.editingId && plan.exposureMinor + stakeMinor > limitMinor;
 
+  /* Why the button is greyed out, said next to it. */
+  const missing = !draft.sportsbook ? 'Choose the betting app.'
+    : contractMode && !hasContracts ? 'Enter the number of contracts.'
+      : contractMode && !stakeMinor ? 'Enter the filled notional (or the limit price to fill it in).'
+        : !contractMode && draft.legs.some((l, i) => !parsed[i]) ? 'Enter valid odds for every selection.'
+          : !stakeMinor ? 'Enter how much you bet.'
+            : contractMode && contracts * 100 <= stakeMinor ? 'The contracts would pay back no more than the filled notional — check both.'
+              : null;
+
   const save = async () => {
     setError(null);
     setSaving(true);
     const body = {
       sportsbook: draft.sportsbook, stake: draft.stake, fee: draft.fee,
       contracts: contractMode ? draft.contracts : '', limitPrice: contractMode ? draft.limitPrice : '',
-      commission: contractMode ? draft.commission : '', totalOdds: draft.legs.length > 1 ? draft.totalOdds : '',
+      commission: '', totalOdds: draft.legs.length > 1 ? draft.totalOdds : '',
       placedAt: draft.placedAt ? new Date(draft.placedAt).toISOString() : undefined, notes: draft.notes,
       legs: draft.legs.map((l) => ({ matchId: l.matchId, market: l.market, line: l.line, selection: l.selection,
         odds: contractMode ? '' : l.odds,
@@ -223,15 +231,13 @@ function SlipDrawer() {
                       <input value={draft.stake} inputMode="decimal" placeholder="9.52" onChange={(e) => set({ stake: e.target.value, stakeAuto: false })} />
                       <span className="subtle">What the contracts cost. Filled in from the limit; change it if the order filled lower.</span>
                     </label>
-                    <label className="slip-field">Commissions
-                      <input value={draft.commission ?? ''} inputMode="decimal" placeholder="0.00" onChange={(e) => set({ commission: e.target.value })} />
-                    </label>
-                    <label className="slip-field">Fees
+                    <label className="slip-field">Commissions and fees
                       <input value={draft.fee} inputMode="decimal" placeholder="0.00" onChange={(e) => set({ fee: e.target.value })} />
+                      <span className="subtle">Both together, as one amount.</span>
                     </label>
                   </div>
-                  <OrderSummary contracts={hasContracts ? contracts : null} limit={limit} notional={stakeMinor} commission={commissionMinor}
-                    fees={parseMoney(draft.fee) ?? 0} fillCents={fillCents} currency={currency} />
+                  <OrderSummary contracts={hasContracts ? contracts : null} limit={limit} notional={stakeMinor}
+                    fees={feeMinor} fillCents={fillCents} currency={currency} />
                 </>
               )}
               {!contractMode && <div className="slip-row">
@@ -299,8 +305,10 @@ function SlipDrawer() {
               <span>{draft.legs.length > 1 ? `Parlay of ${draft.legs.length}` : 'Single'} · {contractMode ? (fillCents ? `${contracts} contracts at ${fillCents}¢` : 'contracts') : `odds ${total ? total.toFixed(2) : '—'}`}</span>
               <span>{feeMinor ? `Costs ${formatMoney((stakeMinor ?? 0) + feeMinor, currency)} · ` : ''}Returns {payout ? formatMoney(payout, currency) : '—'}</span>
             </div>
+            {error && <span className="danger">{error}</span>}
+            {!saving && missing && <span className="subtle">{missing}</span>}
             <div className="bet-actions">
-              <button className="primary" onClick={save} disabled={saving || !payout || !draft.sportsbook}>
+              <button className="primary" onClick={save} disabled={saving || !!missing}>
                 {saving ? 'Saving…' : draft.editingId ? 'Save changes' : 'Record bet'}
               </button>
               <button className="link-button" onClick={() => { clear(); setOpen(false); }}>Discard</button>
@@ -322,16 +330,15 @@ function OddsHint({ text, onUse }) {
 }
 
 /* A contract order laid out as the app shows it. */
-function OrderSummary({ contracts, limit, notional, commission, fees, fillCents, currency }) {
+function OrderSummary({ contracts, limit, notional, fees, fillCents, currency }) {
   const m = (x) => formatMoney(x, currency);
-  const total = (notional ?? 0) + commission + fees;
+  const total = (notional ?? 0) + fees;
   const rows = [
     ['Contracts', contracts ?? '—'],
     ['Limit price', limit ? `${Math.round(limit * 10000) / 100}¢` : '—'],
     ['Cost at the limit', contracts && limit ? `${contracts} × ${Math.round(limit * 10000) / 100}¢ = ${m(Math.round(contracts * limit * 100))}` : '—'],
     ['Filled notional', notional ? `${m(notional)}${fillCents ? ` (${fillCents}¢ a contract)` : ''}` : '—'],
-    ['Commissions', m(commission)],
-    ['Fees', m(fees)],
+    ['Commissions and fees', m(fees)],
   ];
   return (
     <div className="order-summary">

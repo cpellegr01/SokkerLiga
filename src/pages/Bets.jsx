@@ -46,10 +46,11 @@ function BetCard({ bet, onChanged }) {
             <>
               <span>{bet.contracts} contract{bet.contracts === 1 ? '' : 's'}{bet.limitPrice ? ` · limit ${Math.round(bet.limitPrice * 10000) / 100}¢` : ''}</span>
               <span>Filled notional {formatMoney(bet.stakeMinor, bet.currency)}</span>
-              {bet.commissionMinor > 0 && <span>Commissions {formatMoney(bet.commissionMinor, bet.currency)}</span>}
             </>
           ) : <span>Bet {formatMoney(bet.stakeMinor, bet.currency)}</span>}
-          {bet.feeMinor > 0 && <span>Fees {formatMoney(bet.feeMinor, bet.currency)}</span>}
+          {bet.feeMinor + bet.commissionMinor > 0 && (
+            <span>{bet.contracts ? 'Commissions and fees' : 'Fees'} {formatMoney(bet.feeMinor + bet.commissionMinor, bet.currency)}</span>
+          )}
           {bet.totalCostMinor !== bet.stakeMinor && <span>Total cost {formatMoney(bet.totalCostMinor, bet.currency)}</span>}
           <span>Odds {bet.totalOdds.toFixed(2)}</span>
           {bet.outcome === 'pending'
