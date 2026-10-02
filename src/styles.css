@@ -21,13 +21,15 @@
   --danger-bg: #fbeceb;
   --danger-fg: #a3302a;
   --radius: 10px;
-  /* The type scale — every font size on the site is one of these. */
-  --fs-xs: 11px;       /* pills, form letters, small uppercase headings */
+  /* The type scale — every font size on the site is one of these. All
+   * 12px by choice (Claudio, 2026-10-02): hierarchy comes from weight and
+   * colour, not size. Change a step here to change it everywhere. */
+  --fs-xs: 12px;       /* pills, form letters, small uppercase headings */
   --fs-sm: 12px;       /* secondary text, table headers, labels, dates */
-  --fs-base: 14px;     /* body text, tables, buttons, inputs */
-  --fs-lg: 16px;       /* section headings, team names, brand */
-  --fs-xl: 20px;       /* page titles, headline numbers */
-  --fs-display: 28px;  /* the score on the Match Center */
+  --fs-base: 12px;     /* body text, tables, buttons, inputs */
+  --fs-lg: 12px;       /* section headings, team names, brand */
+  --fs-xl: 12px;       /* page titles, headline numbers */
+  --fs-display: 12px;  /* the score on the Match Center */
   font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
   color: var(--fg);
   background: var(--bg);
