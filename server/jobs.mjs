@@ -20,6 +20,7 @@ import {
 } from './ingest.mjs';
 
 const LOCK_MINUTES = 60;
+const RETRY_FAILED_MINUTES = 15;
 
 /* ------------------------------------------------------------- helpers */
 
@@ -276,8 +277,10 @@ export async function runJob(db, key, { providerFactory } = {}) {
     ctx.errors.push(error.message);
   } finally {
     const finishedAt = new Date().toISOString();
-    const nextRun = job.interval_minutes > 0
-      ? new Date(Date.now() + job.interval_minutes * 60_000).toISOString() : null;
+    /* A failed job tries again soon rather than waiting out its interval —
+     * for the weekly competitions job that would be a week. */
+    const minutes = status === 'failed' ? Math.min(job.interval_minutes, RETRY_FAILED_MINUTES) : job.interval_minutes;
+    const nextRun = minutes > 0 ? new Date(Date.now() + minutes * 60_000).toISOString() : null;
     db.prepare(`UPDATE job_runs SET finished_at = ?, status = ?, records_in = ?, records_written = ?,
                   requests_used = ?, message = ?, errors_json = ? WHERE id = ?`)
       .run(finishedAt, status, ctx.recordsIn, ctx.recordsWritten, ctx.provider?.requestsUsed ?? 0,
@@ -300,6 +303,15 @@ export function dueJobs(db, at = new Date().toISOString()) {
       AND (run_requested_at IS NOT NULL
            OR (is_enabled = 1 AND interval_minutes > 0 AND (next_run_at IS NULL OR next_run_at <= ?)))
     ORDER BY ordinal`).all(at, at).map((r) => r.key);
+}
+
+/** On worker start: jobs whose last run failed run again straight away —
+ *  typically the key was missing and has just been added. */
+export function retryFailedNow(db) {
+  return db.prepare(`
+    UPDATE jobs SET next_run_at = NULL
+    WHERE interval_minutes > 0 AND (SELECT status FROM job_runs r WHERE r.job_key = jobs.key ORDER BY id DESC LIMIT 1) = 'failed'`)
+    .run().changes;
 }
 
 export function requestRun(db, key) {

@@ -10,7 +10,7 @@
  */
 
 import { openDatabase } from './db.mjs';
-import { runJob, dueJobs } from './jobs.mjs';
+import { runJob, dueJobs, retryFailedNow } from './jobs.mjs';
 
 const TICK_MS = 15_000;
 
@@ -19,6 +19,7 @@ const db = openDatabase(process.env.SOKKERLIGA_DB ?? undefined);
 /* A lock left behind by a worker that was killed mid-job would block that
  * job for up to an hour; on start nothing is running, so clear them. */
 db.prepare('UPDATE jobs SET locked_until = NULL').run();
+retryFailedNow(db);
 
 let stopping = false;
 for (const signal of ['SIGTERM', 'SIGINT']) {

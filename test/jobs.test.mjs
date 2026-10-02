@@ -1,7 +1,7 @@
 import { test, describe, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { openDatabase } from '../server/db.mjs';
-import { runJob, dueJobs, requestRun, syncStatus } from '../server/jobs.mjs';
+import { runJob, dueJobs, requestRun, syncStatus, retryFailedNow } from '../server/jobs.mjs';
 import { fakeProvider, fixture } from './fixtures/api-football.mjs';
 
 let db;
@@ -62,6 +62,18 @@ describe('Data-refresh jobs', () => {
     assert.equal(run.status, 'failed');
     assert.match(run.message, /No API-Football key/);
     assert.equal(run.requests_used, 0);
+  });
+
+  test('a failed job retries within 15 minutes, and at once after a worker restart', async () => {
+    const saved = process.env.API_FOOTBALL_KEY;
+    delete process.env.API_FOOTBALL_KEY;
+    await runJob(db, 'sync_competitions');
+    if (saved !== undefined) process.env.API_FOOTBALL_KEY = saved;
+    const next = Date.parse(db.prepare("SELECT next_run_at FROM jobs WHERE key = 'sync_competitions'").get().next_run_at);
+    assert.ok(next <= Date.now() + 15 * 60_000 + 1000, 'not a week away');
+    assert.equal(dueJobs(db).includes('sync_competitions'), false);
+    assert.equal(retryFailedNow(db), 1);
+    assert.equal(dueJobs(db).includes('sync_competitions'), true);
   });
 
   test('one failing competition does not stop the others', async () => {
