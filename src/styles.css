@@ -35,6 +35,8 @@
   --fs-section: 14px;
   /* Page titles: bigger again, and bold (Claudio, 2026-10-02). */
   --fs-page: 18px;
+  /* The SokkerLiga name in the top bar. */
+  --fs-brand: 20px;
   font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
   color: var(--fg);
   background: var(--bg);
@@ -106,7 +108,9 @@ input, select {
   position: sticky; top: 0; z-index: 20; display: flex; align-items: center; gap: 0.75rem;
   padding: 0.6rem 16px; background: var(--surface); border-bottom: 1px solid var(--border);
 }
-.brand { font-weight: 400; color: var(--fg); font-size: var(--fs-lg); white-space: nowrap; }
+.brand { display: inline-flex; align-items: center; gap: 0.5rem; font-weight: 700; color: var(--fg);
+  font-size: var(--fs-brand); letter-spacing: -0.01em; white-space: nowrap; }
+.brand-icon { width: 28px; height: 28px; flex-shrink: 0; }
 .brand:hover { text-decoration: none; }
 .topbar-right { margin-left: auto; display: flex; gap: 0.9rem; align-items: center; white-space: nowrap; }
 .menu-button { display: none; border: none; background: none; font-size: 18px; padding: 0.2rem 0.4rem; }

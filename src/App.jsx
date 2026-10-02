@@ -52,7 +52,10 @@ export default function App() {
     <div className="shell">
       <header className="topbar">
         <button className="menu-button" aria-label="Menu" aria-expanded={menuOpen} onClick={() => setMenuOpen((o) => !o)}>☰</button>
-        <a className="brand" href={href('dashboard')}>SokkerLiga</a>
+        <a className="brand" href={href('dashboard')}>
+          <img className="brand-icon" src="/favicon.svg" alt="" width="28" height="28" />
+          SokkerLiga
+        </a>
         <GlobalSearch />
         <div className="topbar-right">
           <span className="subtle hide-sm">{me.user.display_name}</span>
