@@ -609,3 +609,7 @@ input.auto { color: var(--muted); }
 .bracket-leg { display: flex; justify-content: space-between; gap: 0.5rem; }
 .bracket-leg-result { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: right; }
 .bracket-round { min-width: 240px; flex-basis: 240px; } @media (max-width: 720px) { .bracket-round { min-width: 210px; flex-basis: 210px; } }
+/* Bracket lines: hairline and quiet (Claudio, 2026-10-02). */
+.bracket-pair.joins > .bracket-slot::after, .bracket-pair.joins-one > .bracket-slot::after,
+.bracket-slot.fed::before { border-top: 0.5px solid var(--border); }
+.bracket-pair.joins::after { border-right: 0.5px solid var(--border); }
