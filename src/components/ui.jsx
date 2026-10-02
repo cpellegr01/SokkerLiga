@@ -71,7 +71,9 @@ export function FormStrip({ form }) {
   if (!form) return <span className="subtle">—</span>;
   return (
     <span className="form-strip" aria-label={`Form: ${form.split("").map((r) => RESULT_WORD[r] ?? r).join(", ")}`}>
-      {form.split('').map((r, i) => <span key={i} className={`form form-${r}`}>{RESULT_WORD[r] ?? r}</span>)}
+      {form.split('').map((r, i) => (
+        <span key={i} className={`form form-${r}`} title={RESULT_WORD[r] ?? r}>{r}</span>
+      ))}
     </span>
   );
 }

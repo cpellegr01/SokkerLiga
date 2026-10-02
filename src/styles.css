@@ -13,7 +13,8 @@
   --home: #1d6b45;
   --away: #3a5f9e;
   --win: #2e8b57;
-  --draw: #9a9a8e;
+  --draw: #e0b52f;          /* yellow */
+  --draw-fg: #1b1d1a;       /* dark letter: white on yellow is hard to read */
   --loss: #c0453b;
   --live: #d0342c;
   --warn-bg: #fff4dc;
@@ -51,7 +52,8 @@
     --home: #5cc08b;
     --away: #7fa6e6;
     --win: #4fb07a;
-    --draw: #7c7f74;
+    --draw: #d8ac2a;
+    --draw-fg: #1b1d1a;
     --loss: #e0675d;
     --live: #ff6159;
     --warn-bg: #3a2e12;
@@ -207,12 +209,16 @@ input, select {
 .pill.failed, .pill.missing, .pill.cancelled, .pill.abandoned { background: var(--danger-bg); color: var(--danger-fg); }
 
 .form-strip { display: inline-flex; flex-wrap: wrap; gap: 3px; vertical-align: middle; }
+.form-strip { flex-wrap: nowrap; }
+/* Form as circles: green W, yellow D, red L. The word is in the title
+ * (hover) and in the strip's aria-label. */
 .form {
-  padding: 0.1rem 0.4rem; border-radius: 4px; display: inline-flex; align-items: center; justify-content: center;
-  font-size: var(--fs-xs); font-weight: 400; color: #fff;
+  width: 1.7em; height: 1.7em; border-radius: 50%; flex-shrink: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: var(--fs-xs); color: #fff; line-height: 1;
 }
 .form-W { background: var(--win); }
-.form-D { background: var(--draw); }
+.form-D { background: var(--draw); color: var(--draw-fg); }
 .form-L { background: var(--loss); }
 
 .day-strip { display: flex; gap: 0.35rem; overflow-x: auto; padding-bottom: 0.5rem; margin-bottom: 0.75rem; }
