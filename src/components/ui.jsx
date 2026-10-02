@@ -62,11 +62,16 @@ export function Crest({ src, name, size = 24, round = false }) {
   return <img className={`crest${round ? ' round' : ''}`} src={src} alt="" style={style} loading="lazy" onError={() => setFailed(true)} />;
 }
 
+const RESULT_WORD = { W: 'Win', D: 'Draw', L: 'Loss' };
+
+/* "1 win", "2 wins" — counts in words, never W/D/L. */
+const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+
 export function FormStrip({ form }) {
   if (!form) return <span className="subtle">—</span>;
   return (
-    <span className="form-strip" aria-label={`Form ${form}`}>
-      {form.split('').map((r, i) => <span key={i} className={`form form-${r}`}>{r}</span>)}
+    <span className="form-strip" aria-label={`Form: ${form.split("").map((r) => RESULT_WORD[r] ?? r).join(", ")}`}>
+      {form.split('').map((r, i) => <span key={i} className={`form form-${r}`}>{RESULT_WORD[r] ?? r}</span>)}
     </span>
   );
 }
@@ -83,7 +88,7 @@ export function StatusPill({ match }) {
 export function MatchRow({ match, showCompetition = false, showDay = false }) {
   const played = match.score && match.status !== 'scheduled';
   return (
-    <a className={`match-row${match.status === 'live' ? ' is-live' : ''}`} href={href('match', match.id)}>
+    <a className={`match-row${match.status === 'live' ? ' is-live' : ''}${showDay ? ' with-day' : ''}`} href={href('match', match.id)}>
       <span className="match-time">
         {showDay && <span className="match-day">{kickoffDay(match.kickoffUtc)}</span>}
         {kickoffTime(match.kickoffUtc)}
@@ -180,8 +185,8 @@ export function StandingsTable({ group, highlight = [] }) {
       <table className="standings">
         <thead>
           <tr>
-            <th className="num">#</th><th>Team</th><th className="num">P</th><th className="num">W</th>
-            <th className="num">D</th><th className="num">L</th><th className="num hide-sm">GF</th>
+            <th className="num">#</th><th>Team</th><th className="num">P</th><th className="num">Wins</th>
+            <th className="num">Draws</th><th className="num">Losses</th><th className="num hide-sm">GF</th>
             <th className="num hide-sm">GA</th><th className="num">GD</th><th className="num">Pts</th>
             <th className="hide-sm">Form</th>
           </tr>
@@ -214,7 +219,7 @@ export function Record({ r }) {
   if (!r || !r.played) return <span className="subtle">No matches yet</span>;
   return (
     <span>
-      <strong>{r.won}</strong>W <strong>{r.drawn}</strong>D <strong>{r.lost}</strong>L
+      {plural(r.won, 'win', 'wins')}, {plural(r.drawn, 'draw', 'draws')}, {plural(r.lost, 'loss', 'losses')}
       <span className="subtle"> · {r.goalsFor}–{r.goalsAgainst}</span>
     </span>
   );
