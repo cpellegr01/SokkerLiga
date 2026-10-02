@@ -617,3 +617,7 @@ input.auto { color: var(--muted); }
 .bracket-pair.joins > .bracket-slot::after, .bracket-pair.joins-one > .bracket-slot::after,
 .bracket-slot.fed::before { border-top: 1px solid color-mix(in srgb, var(--muted) 45%, var(--border)); }
 .bracket-pair.joins::after { border-right: 1px solid color-mix(in srgb, var(--muted) 45%, var(--border)); }
+/* Thinner again, same shade. */
+.bracket-pair.joins > .bracket-slot::after, .bracket-pair.joins-one > .bracket-slot::after,
+.bracket-slot.fed::before { border-top-width: 0.5px; }
+.bracket-pair.joins::after { border-right-width: 0.5px; }
