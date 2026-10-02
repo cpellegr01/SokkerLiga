@@ -590,3 +590,19 @@ input.auto { color: var(--muted); }
 .bracket-tie.projected { border-style: dashed; background: transparent; }
 .bracket-legs { white-space: normal; overflow: visible; }
 .nowrap { white-space: nowrap; }
+
+/* Bracket lines: elbows between rounds (gap 2rem: 1rem out, 1rem in). */
+.bracket { gap: 2rem; }
+.bracket-round h4 { white-space: normal; min-height: 2.6em; }
+.bracket-ties { justify-content: stretch; gap: 0; }
+.bracket-pair { flex: 1; display: flex; flex-direction: column; position: relative; }
+.bracket-slot { flex: 1; display: flex; align-items: center; position: relative; padding: 0.3rem 0; }
+.bracket-slot > .bracket-tie { width: 100%; }
+.bracket-tie.joins::after { display: none; }
+/* out of each tie that feeds the next round */
+.bracket-pair.joins > .bracket-slot::after, .bracket-pair.joins-one > .bracket-slot::after {
+  content: ''; position: absolute; right: -1rem; top: 50%; width: 1rem; border-top: 1px solid var(--muted); }
+/* the upright joining the pair: from the first tie's middle to the second's */
+.bracket-pair.joins::after { content: ''; position: absolute; right: -1rem; top: 25%; bottom: 25%; border-right: 1px solid var(--muted); }
+/* into the tie it feeds */
+.bracket-slot.fed::before { content: ''; position: absolute; left: -1rem; top: 50%; width: 1rem; border-top: 1px solid var(--muted); }

@@ -59,14 +59,7 @@ export default function Brackets({ id, params }) {
               )}
             </div>
             <div className="bracket" role="region" aria-label={`${data.competition.name} bracket`}>
-              {[...(qualifying ? data.qualifying : []), ...data.rounds].map((r, i, all) => (
-                <div key={r.name} className="bracket-round">
-                  <h4>{r.name}</h4>
-                  <div className="bracket-ties">
-                    {r.ties.map((t) => <Tie key={t.key} tie={t} last={i === all.length - 1} />)}
-                  </div>
-                </div>
-              ))}
+              <BracketColumns rounds={[...(qualifying ? data.qualifying : []), ...data.rounds]} />
             </div>
             {data.sideRounds.length > 0 && (
               <>
@@ -75,7 +68,7 @@ export default function Brackets({ id, params }) {
                   {data.sideRounds.map((r) => (
                     <div key={r.name} className="bracket-round">
                       <h4>{r.name}</h4>
-                      <div className="bracket-ties">{r.ties.map((t) => <Tie key={t.key} tie={t} last />)}</div>
+                      <div className="bracket-ties">{r.ties.map((t) => <Tie key={t.key} tie={t} />)}</div>
                     </div>
                   ))}
                 </div>
@@ -84,7 +77,7 @@ export default function Brackets({ id, params }) {
             {data.thirdPlace && (
               <div className="bracket-extra">
                 <h4>{data.thirdPlace.name}</h4>
-                {data.thirdPlace.ties.map((t) => <Tie key={t.key} tie={t} last />)}
+                {data.thirdPlace.ties.map((t) => <Tie key={t.key} tie={t} />)}
               </div>
             )}
           </>
@@ -94,10 +87,51 @@ export default function Brackets({ id, params }) {
   );
 }
 
-function Tie({ tie, last }) {
+/* The rounds as columns. Where a round has twice as many ties as the next,
+ * each pair of ties is joined to the tie it feeds with an elbow line:
+ * right, then down (or up) to meet its partner, then right into the next
+ * box. Every column is the same height and each tie sits in an equal slot,
+ * so the lines meet exactly between the two ties they join. */
+function BracketColumns({ rounds }) {
+  /* "MLS Cup - Round 1" → "Round 1" when every round shares the prefix. */
+  const prefix = commonPrefix(rounds.map((r) => r.name));
+  return rounds.map((r, i) => {
+    const next = rounds[i + 1];
+    const prev = rounds[i - 1];
+    const feeds = next && Math.ceil(r.ties.length / 2) === next.ties.length && r.ties.length > 1;
+    const fed = prev && Math.ceil(prev.ties.length / 2) === r.ties.length && prev.ties.length > 1;
+    const pairs = [];
+    for (let j = 0; j < r.ties.length; j += feeds ? 2 : 1) pairs.push(r.ties.slice(j, feeds ? j + 2 : j + 1));
+    return (
+      <div key={r.name} className="bracket-round">
+        <h4 title={r.name}>{r.name.slice(prefix.length) || r.name}</h4>
+        <div className="bracket-ties">
+          {pairs.map((pair) => (
+            <div key={pair[0].key} className={`bracket-pair${feeds && pair.length === 2 ? ' joins' : ''}${feeds && pair.length === 1 ? ' joins-one' : ''}`}>
+              {pair.map((t) => (
+                <div key={t.key} className={`bracket-slot${fed ? ' fed' : ''}`}><Tie tie={t} /></div>
+              ))}
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  });
+}
+
+function commonPrefix(names) {
+  if (names.length < 2) return '';
+  let p = names[0];
+  for (const n of names) while (!n.startsWith(p)) p = p.slice(0, -1);
+  /* Cut back to the end of a separator, so only whole words go. */
+  const m = p.match(/^(.*[-–:·])\s*/);
+  return m ? m[0] : '';
+}
+
+function Tie({ tie }) {
   if (tie.kind === 'projected') {
     return (
-      <div className={`bracket-tie projected${last ? '' : ' joins'}`}>
+      <div className="bracket-tie projected">
         {tie.slots.map((t, i) => (
           <div key={i} className="bracket-team">
             {t.id ? <a className="team-cell" href={href('team', t.id)}><Crest src={t.logo} name={t.name} size={16} /> <span className="team-name">{t.name}</span></a>
@@ -110,7 +144,7 @@ function Tie({ tie, last }) {
   }
   const scoreOf = (t) => (tie.kind === 'series' ? t.wins : tie.legs.some((l) => l.score) ? t.goals : '');
   return (
-    <div className={`bracket-tie${last ? '' : ' joins'}`}>
+    <div className="bracket-tie">
       {tie.teams.map((t) => (
         <div key={t.id} className={`bracket-team${t.winner ? ' winner' : tie.decided ? ' out' : ''}`}>
           <a className="team-cell" href={href('team', t.id)}><Crest src={t.logo} name={t.name} size={16} /> <span className="team-name">{t.name}</span></a>
