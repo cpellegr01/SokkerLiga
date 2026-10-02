@@ -369,8 +369,13 @@ function OrderSummary({ order, contracts, limit, notional, fees, fillCents, curr
       {order && notional && order > total ? <div><span className="subtle">Not spent</span><span>{m(order - total)}</span></div> : null}
       {order && notional && order < total ? <div><span className="danger">The total cost is more than the bet — check the figures.</span><span /></div> : null}
       {contracts && notional ? (
-        <div><span className="subtle">Pays if it wins</span>
-          <span>{m(Math.round(contracts * 100))} · profit <span className={contracts * 100 - total > 0 ? 'profit-up' : 'profit-down'}>{m(Math.round(contracts * 100) - total)}</span></span></div>
+        <>
+          <div><span className="subtle">Pays if it wins</span><span>{m(Math.round(contracts * 100))}</span></div>
+          <div><span className="subtle">Realized profit if it wins</span>
+            <span className="profit-up">{m(Math.round(contracts * 100) - notional)}</span></div>
+          {fees > 0 && <div><span className="subtle">After commissions &amp; fees</span>
+            <span className={contracts * 100 - total > 0 ? 'profit-up' : 'profit-down'}>{m(Math.round(contracts * 100) - total)}</span></div>}
+        </>
       ) : null}
     </div>
   );

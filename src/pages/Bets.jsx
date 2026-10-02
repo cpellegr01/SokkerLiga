@@ -56,7 +56,14 @@ function BetCard({ bet, onChanged }) {
           <span>Odds {bet.totalOdds.toFixed(2)}</span>
           {bet.outcome === 'pending'
             ? <span>Returns {formatMoney(bet.potentialPayoutMinor, bet.currency)}</span>
-            : <span>Profit <Profit minor={bet.profitMinor} currency={bet.currency} format={formatMoney} /></span>}
+            : bet.contracts && bet.feeMinor + bet.commissionMinor > 0 && bet.profitMinor !== null ? (
+              /* As the app reports it (before commissions & fees), then what
+               * was actually made after them. */
+              <>
+                <span>Realized profit <Profit minor={bet.profitMinor + bet.feeMinor + bet.commissionMinor} currency={bet.currency} format={formatMoney} /></span>
+                <span>After commissions &amp; fees <Profit minor={bet.profitMinor} currency={bet.currency} format={formatMoney} /></span>
+              </>
+            ) : <span>Profit <Profit minor={bet.profitMinor} currency={bet.currency} format={formatMoney} /></span>}
           <OutcomeBadge outcome={bet.outcome} />
           {bet.settledBy === 'manual' && <span className="subtle">Corrected by hand</span>}
           {bet.settledBy === 'manual' && (
