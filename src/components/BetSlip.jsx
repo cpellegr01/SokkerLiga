@@ -18,7 +18,7 @@ const STORE = 'sokkerliga.betslip';
 const load = () => {
   try { return JSON.parse(localStorage.getItem(STORE)) ?? null; } catch { return null; }
 };
-const emptyDraft = () => ({ editingId: null, legs: [], stake: '', fee: '', sportsbook: '', placedAt: '', totalOdds: '', notes: '' });
+const emptyDraft = () => ({ editingId: null, legs: [], stake: '', fee: '', contracts: '', stakeAuto: false, sportsbook: '', placedAt: '', totalOdds: '', notes: '' });
 
 export function BetSlipProvider({ children }) {
   const [draft, setDraft] = useState(() => load() ?? emptyDraft());
@@ -42,6 +42,7 @@ export function BetSlipProvider({ children }) {
     edit(bet) {
       setDraft({
         editingId: bet.id, stake: (bet.stakeMinor / 100).toFixed(2), fee: bet.feeMinor ? (bet.feeMinor / 100).toFixed(2) : '',
+        contracts: bet.contracts ? String(bet.contracts) : '', stakeAuto: false,
         sportsbook: bet.sportsbook.key,
         placedAt: toLocalInput(bet.placedAt), totalOdds: bet.totalOddsText ?? '', notes: bet.notes ?? '',
         legs: bet.legs.map((l) => ({ matchId: l.matchId, home: l.home, away: l.away, kickoffUtc: l.kickoffUtc,
@@ -103,8 +104,18 @@ function SlipDrawer() {
   const product = parsed.every(Boolean) && parsed.length ? parsed.reduce((a, p) => a * p.decimal, 1) : null;
   const total = draft.totalOdds ? parseOdds(draft.totalOdds)?.decimal ?? null : product;
   const stakeMinor = parseMoney(draft.stake);
-  const payout = total && stakeMinor ? Math.round(stakeMinor * total) : null;
+  const contracts = Number(String(draft.contracts ?? '').replace(',', '.'));
+  const hasContracts = contracts > 0;
+  const payout = hasContracts ? Math.round(contracts * 100) : total && stakeMinor ? Math.round(stakeMinor * total) : null;
   const feeMinor = parseMoney(draft.fee) ?? 0;
+  /* Contracts × price fills in the bet, until the bet is typed by hand. */
+  const contractCost = hasContracts && total ? Math.round((contracts * 100) / total) : null;
+  useEffect(() => {
+    if (contractCost && (draft.stakeAuto || !draft.stake)) {
+      const v = (contractCost / 100).toFixed(2);
+      if (v !== draft.stake) setDraft((d) => ({ ...d, stake: v, stakeAuto: true }));
+    }
+  }, [contractCost]); // eslint-disable-line react-hooks/exhaustive-deps
   /* The bankroll plan for this app's currency, if one is set up. When
    * editing, this bet's own stake is already counted as open. */
   const plan = bankrolls.find((b) => b.currency === currency) ?? null;
@@ -115,7 +126,7 @@ function SlipDrawer() {
     setError(null);
     setSaving(true);
     const body = {
-      sportsbook: draft.sportsbook, stake: draft.stake, fee: draft.fee, totalOdds: draft.legs.length > 1 ? draft.totalOdds : '',
+      sportsbook: draft.sportsbook, stake: draft.stake, fee: draft.fee, contracts: draft.contracts, totalOdds: draft.legs.length > 1 ? draft.totalOdds : '',
       placedAt: draft.placedAt ? new Date(draft.placedAt).toISOString() : undefined, notes: draft.notes,
       legs: draft.legs.map((l) => ({ matchId: l.matchId, market: l.market, line: l.line, selection: l.selection, odds: l.odds,
         closingOdds: l.closingOdds || undefined })),
@@ -179,7 +190,7 @@ function SlipDrawer() {
             <>
               <div className="slip-row">
                 <label className="slip-field">Bet ({currency})
-                  <input value={draft.stake} inputMode="decimal" placeholder="10.00" onChange={(e) => set({ stake: e.target.value })} />
+                  <input value={draft.stake} inputMode="decimal" placeholder="10.00" onChange={(e) => set({ stake: e.target.value, stakeAuto: false })} />
                   <span className="subtle">The amount you put on the bet — what you lose if it loses.</span>
                   {payout && (
                     <span className="subtle">
@@ -187,6 +198,12 @@ function SlipDrawer() {
                       {formatMoney(payout - stakeMinor, currency)}{feeMinor ? `, less ${formatMoney(feeMinor, currency)} fees: ${formatMoney(payout - stakeMinor - feeMinor, currency)} profit` : ' profit'}.
                     </span>
                   )}
+                </label>
+                <label className="slip-field">Contracts (optional)
+                  <input value={draft.contracts} inputMode="decimal" placeholder="e.g. 14" onChange={(e) => set({ contracts: e.target.value })} />
+                  <span className="subtle">For apps that sell contracts paying {formatMoney(100, currency)} each (Robinhood, Kalshi). With the price,
+                    the bet fills itself in{contractCost ? `: ${contracts} × ${formatMoney(Math.round(100 / total), currency)} = ${formatMoney(contractCost, currency)}` : ''}.
+                    Change the bet if the app shows a different amount.</span>
                 </label>
                 <label className="slip-field">Fees ({currency}, optional)
                   <input value={draft.fee} inputMode="decimal" placeholder="0.00" onChange={(e) => set({ fee: e.target.value })} />

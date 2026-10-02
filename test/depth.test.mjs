@@ -250,3 +250,20 @@ describe('Fees', () => {
       legs: [{ matchId: past, market: 'btts', selection: 'yes', odds: '2' }] }), /Fees must be an amount/);
   });
 });
+
+describe('Contracts', () => {
+  test('each contract pays exactly 1.00: 14 at 68¢ returns 14.00', () => {
+    saveSportsbook(db, { name: 'Robinhood', currency: 'USD' });
+    const past = league.matchIds[61];
+    const m = db.prepare('SELECT kickoff_utc, home_goals, away_goals FROM matches WHERE id = ?').get(past);
+    const won = m.home_goals > m.away_goals ? 'home' : m.home_goals < m.away_goals ? 'away' : 'draw';
+    const bet = createBet(db, 'u1', { sportsbook: 'robinhood', stake: '9.52', fee: '0.28', contracts: '14',
+      placedAt: new Date(Date.parse(m.kickoff_utc) - 3600_000).toISOString(),
+      legs: [{ matchId: past, market: 'match_result', selection: won, odds: '68%' }] });
+    assert.equal(bet.contracts, 14);
+    assert.equal(bet.potentialPayoutMinor, 1400);
+    assert.equal(bet.profitMinor, 1400 - 952 - 28, '$4.20 after fees');
+    assert.throws(() => createBet(db, 'u1', { sportsbook: 'robinhood', stake: '20', contracts: '14',
+      legs: [{ matchId: past, market: 'btts', selection: 'yes', odds: '68%' }] }), /pay back no more than the bet/);
+  });
+});

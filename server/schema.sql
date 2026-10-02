@@ -692,6 +692,7 @@ CREATE TABLE IF NOT EXISTS bets (
   total_odds_text        TEXT,                   -- as typed, when the app quoted its own total
   potential_payout_minor INTEGER NOT NULL,
   fee_minor              INTEGER NOT NULL DEFAULT 0,   -- the app's fees, charged on top of the bet and never returned
+  contracts              REAL,                          -- prediction-market apps: contracts bought, each paying 1.00 if it wins
   notes                  TEXT,
   created_at             TEXT NOT NULL,
   updated_at             TEXT NOT NULL,

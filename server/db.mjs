@@ -72,6 +72,7 @@ const ADDED_COLUMNS = [
   ['jobs', 'quota_priority', "TEXT NOT NULL DEFAULT 'normal'"],
   ['analysis_runs', 'calibration_json', 'TEXT'],
   ['bets', 'fee_minor', 'INTEGER NOT NULL DEFAULT 0'],
+  ['bets', 'contracts', 'REAL'],
 ];
 
 function addMissingColumns(db) {

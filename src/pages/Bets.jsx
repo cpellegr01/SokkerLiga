@@ -43,6 +43,7 @@ function BetCard({ bet, onChanged }) {
         </div>
         <div className="bet-figures">
           <span>Bet {formatMoney(bet.stakeMinor, bet.currency)}</span>
+          {bet.contracts && <span>{bet.contracts} contract{bet.contracts === 1 ? '' : 's'}</span>}
           {bet.feeMinor > 0 && <span>Fees {formatMoney(bet.feeMinor, bet.currency)}</span>}
           <span>Odds {bet.totalOdds.toFixed(2)}</span>
           {bet.outcome === 'pending'
