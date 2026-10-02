@@ -24,7 +24,7 @@ export default function Team({ id, me, onFavourite }) {
             {[team.country, team.founded && `Founded ${team.founded}`, team.venue && `${team.venue.name}${team.venue.capacity ? ` (${team.venue.capacity.toLocaleString()})` : ''}`,
               manager && `Manager ${manager.name}`].filter(Boolean).join(' · ')}
           </p>
-          <p>Form <FormStrip form={form.form} /></p>
+          <p>Team Form <FormStrip form={form.form} /></p>
         </div>
         <FavouriteStar on={isFav} label={team.name} onToggle={() => onFavourite('team', team.id, !isFav)} />
       </div>

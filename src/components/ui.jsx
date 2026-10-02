@@ -191,7 +191,7 @@ export function StandingsTable({ group, highlight = [] }) {
             <th className="num">#</th><th>Team</th><th className="num">P</th><th className="num">Wins</th>
             <th className="num">Draws</th><th className="num">Losses</th><th className="num hide-sm">GF</th>
             <th className="num hide-sm">GA</th><th className="num">GD</th><th className="num">Pts</th>
-            <th className="hide-sm">Form</th>
+            <th className="hide-sm">Team Form</th>
           </tr>
         </thead>
         <tbody>
