@@ -5,6 +5,7 @@ import { parseOdds, describeOdds, parseMoney, formatMoney } from '../odds.js';
 import { MARKET_OPTIONS, selectionLabel } from '../markets.js';
 import { kickoff } from '../format.js';
 import { ErrorBanner } from './ui.jsx';
+import DatePicker from './DatePicker.jsx';
 
 /* The bet slip: where a bet placed in the betting app is recorded.
  * Selections can be added from a match's Analysis tab ("I bet this") or by
@@ -183,10 +184,11 @@ function SlipDrawer() {
                   <span className="subtle">Leave empty to multiply the selections. Fill it in if the app boosted or rounded the price.</span>
                 </label>
               )}
-              <label className="slip-field">Placed at
-                <input type="datetime-local" value={draft.placedAt} onChange={(e) => set({ placedAt: e.target.value })} />
-                <span className="subtle">Leave empty for now.</span>
-              </label>
+              <div className="slip-field">Placed at
+                <DatePicker mode="datetime" label="Placed at" value={draft.placedAt} placeholder="Now"
+                  onChange={(v) => set({ placedAt: v })} />
+                <span className="subtle">Leave as "Now" if you just placed it.</span>
+              </div>
               <label className="slip-field">Notes
                 <textarea rows={2} value={draft.notes} onChange={(e) => set({ notes: e.target.value })} />
               </label>

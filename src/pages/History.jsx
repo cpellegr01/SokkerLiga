@@ -2,6 +2,7 @@ import { useState } from 'react';
 import * as api from '../api.js';
 import { formatMoney } from '../odds.js';
 import { MARKET_OPTIONS } from '../markets.js';
+import DatePicker from '../components/DatePicker.jsx';
 import { useApi, Page, Loading, ErrorBanner, Empty, Profit } from '../components/ui.jsx';
 
 const pct = (x) => (x === null || x === undefined ? '—' : `${(x * 100).toFixed(1)}%`);
@@ -18,8 +19,8 @@ export default function History() {
   return (
     <Page title="Betting History" subtitle="How your recorded bets have done. Luck and judgement are shown apart: a bet with an edge can lose, and one without can win.">
       <div className="filters">
-        <label className="check">From <input type="date" value={f.from} onChange={(e) => set({ from: e.target.value })} /></label>
-        <label className="check">To <input type="date" value={f.to} onChange={(e) => set({ to: e.target.value })} /></label>
+        <span className="check">From <DatePicker label="From" value={f.from} placeholder="Any date" onChange={(v) => set({ from: v })} /></span>
+        <span className="check">To <DatePicker label="To" value={f.to} placeholder="Any date" onChange={(v) => set({ to: v })} /></span>
         <select value={f.sportsbook} onChange={(e) => set({ sportsbook: e.target.value })} aria-label="Betting app">
           <option value="">All betting apps</option>
           {(books.data ?? []).map((b) => <option key={b.key} value={b.key}>{b.name}</option>)}

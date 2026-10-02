@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import * as api from '../api.js';
 import { localDayRange, kickoffDay } from '../format.js';
+import DatePicker from '../components/DatePicker.jsx';
 import { useApi, Page, Loading, ErrorBanner, MatchesByCompetition } from '../components/ui.jsx';
 
 const STATUSES = [['', 'Any status'], ['scheduled', 'Scheduled'], ['live', 'Live'], ['finished', 'Finished'],
@@ -41,6 +42,10 @@ export default function Matches({ params }) {
       </div>
 
       <div className="filters">
+        <span className="check">Go to date
+          <DatePicker label="Go to date" clearable={false} value={dayKey(offset)}
+            onChange={(v) => v && setOffset(daysFromToday(v))} />
+        </span>
         <select value={competition} onChange={(e) => { setCompetition(e.target.value); setTeam(''); }} aria-label="Competition">
           <option value="">All competitions</option>
           {enabled.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
@@ -67,4 +72,16 @@ export default function Matches({ params }) {
         : <p className="subtle">No matches for this day and these filters.</p>)}
     </Page>
   );
+}
+
+/* The day strip works in offsets from today; the calendar in dates. */
+function dayKey(offset) {
+  const d = new Date();
+  d.setDate(d.getDate() + offset);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+function daysFromToday(key) {
+  const [y, m, d] = key.split('-').map(Number);
+  const t = new Date();
+  return Math.round((new Date(y, m - 1, d) - new Date(t.getFullYear(), t.getMonth(), t.getDate())) / 86400_000);
 }
