@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { href } from '../router.js';
 import { kickoffTime, kickoffDay, STATUS_LABEL } from '../format.js';
+import { STANCE_LABEL } from '../markets.js';
 
 /* ----------------------------------------------------------- data hook */
 
@@ -225,4 +226,18 @@ export function Record({ r }) {
       <span className="subtle"> · {r.goalsFor}–{r.goalsAgainst}</span>
     </span>
   );
+}
+
+/** Claude's verdict on a selection: green Supports, yellow Cautious, red Disagrees. */
+export function StanceBadge({ stance, prefix = '' }) {
+  if (!stance) return null;
+  return <span className={`pill stance-${stance}`}>{prefix}{STANCE_LABEL[stance] ?? stance}</span>;
+}
+
+/** Recommend (green) or Pass (red); a Pass explains itself on hover. */
+export function DecisionBadge({ decision, reasons = [] }) {
+  if (!decision) return null;
+  return decision === 'recommend'
+    ? <span className="pill decision-recommend">Recommend</span>
+    : <span className="pill decision-pass" title={reasons.join('\n')}>Pass</span>;
 }

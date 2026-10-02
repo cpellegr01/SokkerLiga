@@ -2,8 +2,8 @@ import { useState } from 'react';
 import * as api from '../api.js';
 import { href } from '../router.js';
 import { kickoff } from '../format.js';
-import { CONFIDENCE_LABEL, STANCE_LABEL } from '../markets.js';
-import { useApi, Page, Loading, ErrorBanner, Empty, Crest } from '../components/ui.jsx';
+import { CONFIDENCE_LABEL } from '../markets.js';
+import { useApi, Page, Loading, ErrorBanner, Empty, Crest, StanceBadge, DecisionBadge } from '../components/ui.jsx';
 
 export default function Predictions() {
   const [decision, setDecision] = useState('recommend');
@@ -60,8 +60,8 @@ export default function Predictions() {
                     <td className="num">{(p.probability * 100).toFixed(1)}%</td>
                     <td className="num">{p.fairOdds.toFixed(2)}</td>
                     <td className="hide-sm">{CONFIDENCE_LABEL[p.confidence]}</td>
-                    <td title={p.passReasons.join('\n')}>{p.decision === 'recommend' ? <span className="pill finished">Recommend</span> : <span className="subtle">Pass</span>}</td>
-                    <td className="hide-sm">{p.aiStance ? STANCE_LABEL[p.aiStance] : ''}</td>
+                    <td title={p.passReasons.join('\n')}><DecisionBadge decision={p.decision} reasons={p.passReasons} /></td>
+                    <td className="hide-sm"><StanceBadge stance={p.aiStance} /></td>
                     <td className="hide-sm">{p.homeGoals !== null && p.status === 'finished' ? `${p.homeGoals}–${p.awayGoals}` : '—'}</td>
                   </tr>
                 ))}

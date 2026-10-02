@@ -339,9 +339,15 @@ button.primary { background: var(--accent); color: var(--accent-fg); border-colo
 .section-toggle { display: flex; justify-content: space-between; align-items: center; padding-bottom: 0.75rem; }
 .section-toggle h3 { margin: 0; }
 .group-row td { background: var(--surface-2); font-weight: 400; }
-.pill.conf-high, .pill.stance-support { background: var(--accent-soft); color: var(--accent); }
-.pill.conf-medium, .pill.stance-caution { background: var(--warn-bg); color: var(--warn-fg); }
-.pill.conf-low, .pill.stance-oppose { background: var(--danger-bg); color: var(--danger-fg); }
+.pill.conf-high { background: var(--accent-soft); color: var(--accent); }
+.pill.conf-medium { background: var(--warn-bg); color: var(--warn-fg); }
+.pill.conf-low { background: var(--danger-bg); color: var(--danger-fg); }
+/* Pass, and Claude's verdict: the same green / yellow / red as the form circles. */
+.pill.decision-pass { background: var(--loss); color: #fff; }
+.pill.decision-recommend { background: var(--win); color: #fff; }
+.pill.stance-support { background: var(--win); color: #fff; }
+.pill.stance-caution { background: var(--draw); color: var(--draw-fg); }
+.pill.stance-oppose { background: var(--loss); color: #fff; }
 .rec-row { display: flex; flex-direction: column; gap: 0.15rem; padding: 0.55rem 1rem; border-top: 1px solid var(--border); color: var(--fg); }
 .rec-row:first-child { border-top: none; }
 .rec-row:hover { background: var(--surface-2); text-decoration: none; }

@@ -2,8 +2,8 @@ import { useEffect, useState } from 'react';
 import * as api from '../api.js';
 import { href } from '../router.js';
 import { longDate, ago } from '../format.js';
-import { CONFIDENCE_LABEL, STANCE_LABEL } from '../markets.js';
-import { useApi, Loading, ErrorBanner } from '../components/ui.jsx';
+import { CONFIDENCE_LABEL } from '../markets.js';
+import { useApi, Loading, ErrorBanner, StanceBadge, DecisionBadge } from '../components/ui.jsx';
 
 const pct = (p) => `${(p * 100).toFixed(1)}%`;
 
@@ -188,7 +188,7 @@ function TopPicks({ predictions }) {
               <span><strong>{pct(p.probability)}</strong> probability</span>
               <span><strong>{p.fairOdds.toFixed(2)}</strong> fair odds</span>
               <span className={`pill conf-${p.confidence}`}>{CONFIDENCE_LABEL[p.confidence]} confidence</span>
-              {p.aiStance && <span className={`pill stance-${p.aiStance}`}>Claude: {STANCE_LABEL[p.aiStance]}</span>}
+              <StanceBadge stance={p.aiStance} prefix="Claude: " />
             </div>
             <Factors factors={p.factors} />
           </div>
@@ -238,9 +238,9 @@ function AllMarkets({ predictions }) {
                     <td className="num">{p.fairOdds.toFixed(2)}</td>
                     <td>{CONFIDENCE_LABEL[p.confidence]}</td>
                     <td title={p.passReasons.join('\n')}>
-                      {p.decision === 'recommend' ? <span className="pill finished">Recommend</span> : <span className="subtle">Pass</span>}
+                      <DecisionBadge decision={p.decision} reasons={p.passReasons} />
                     </td>
-                    <td className="hide-sm">{p.aiStance ? STANCE_LABEL[p.aiStance] : ''}</td>
+                    <td className="hide-sm"><StanceBadge stance={p.aiStance} /></td>
                   </tr>
                 )),
               ])}
