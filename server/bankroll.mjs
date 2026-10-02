@@ -36,10 +36,10 @@ export function saveBankrollSettings(db, userId, input) {
   let amount;
   if (input.method === 'percent') {
     amount = Number(String(input.amount ?? '').replace(',', '.'));
-    if (!(amount > 0 && amount <= 10)) throw new ValidationError('A percentage stake should be between 0.1% and 10% of the balance.');
+    if (!(amount > 0 && amount <= 10)) throw new ValidationError('A percentage bet should be between 0.1% and 10% of the balance.');
   } else {
     amount = parseMoney(input.amount);
-    if (!amount || amount <= 0) throw new ValidationError(input.method === 'flat' ? 'Enter the stake.' : 'Enter the unit size.');
+    if (!amount || amount <= 0) throw new ValidationError(input.method === 'flat' ? 'Enter the bet amount.' : 'Enter the unit size.');
   }
   const maxExposure = Number(input.maxExposurePct ?? 25);
   if (!(maxExposure > 0 && maxExposure <= 100)) throw new ValidationError('Maximum exposure must be between 1% and 100%.');

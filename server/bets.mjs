@@ -77,7 +77,7 @@ function normaliseBet(db, input) {
   const book = db.prepare('SELECT * FROM sportsbooks WHERE key = ?').get(input.sportsbook);
   if (!book) throw new ValidationError('Choose the betting app the bet was placed with.');
   const stakeMinor = Number.isInteger(input.stakeMinor) ? input.stakeMinor : parseMoney(input.stake);
-  if (!stakeMinor || stakeMinor <= 0) throw new ValidationError('Enter the stake.');
+  if (!stakeMinor || stakeMinor <= 0) throw new ValidationError('Enter how much you bet.');
   const legs = Array.isArray(input.legs) ? input.legs : [];
   if (!legs.length) throw new ValidationError('A bet needs at least one selection.');
   const placedAt = input.placedAt ? new Date(input.placedAt) : new Date();

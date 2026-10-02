@@ -77,7 +77,7 @@ function Totals({ t, money, currency }) {
       <Kpi label="Bets" value={`${t.bets}${t.open ? ` (${t.open} open)` : ''}`} />
       <Kpi label="Wins / losses / pushes" value={`${t.won} / ${t.lost} / ${t.pushed}`} />
       <Kpi label="Win rate" value={pct(t.winRate)} />
-      <Kpi label="Staked" value={money(t.stakedMinor)} />
+      <Kpi label="Total bet" value={money(t.stakedMinor)} />
       <Kpi label="Returned" value={money(t.returnedMinor)} />
       <Kpi label="Net profit" value={<Profit minor={t.profitMinor} currency={currency} format={formatMoney} />} />
       <Kpi label="ROI" value={pct(t.roi)} />
@@ -104,7 +104,7 @@ function Breakdown({ title, note, rows, money, currency }) {
       <div className="table-wrap">
         <table className="data">
           <thead><tr><th>{' '}</th><th className="num">Bets</th><th className="num">Wins</th><th className="num">Losses</th>
-            <th className="num hide-sm">Pushes</th><th className="num hide-sm">Staked</th><th className="num">Profit</th><th className="num">ROI</th></tr></thead>
+            <th className="num hide-sm">Pushes</th><th className="num hide-sm">Total bet</th><th className="num">Profit</th><th className="num">ROI</th></tr></thead>
           <tbody>
             {rows.map((r) => (
               <tr key={r.key}>

@@ -135,7 +135,7 @@ function betsAnswer(db, userId, f) {
   if (!t.bets) answer = 'No recorded bets match this.';
   else {
     answer = `${f.restatement || 'Your bets'}: ${t.bets} bet${t.bets === 1 ? '' : 's'} (${t.settled} settled), `
-      + `${t.won} won and ${t.lost} lost, profit ${money(t.profitMinor)} on ${money(t.stakedMinor)} staked`
+      + `${t.won} won and ${t.lost} lost, profit ${money(t.profitMinor)} on ${money(t.stakedMinor)} bet`
       + `${t.roi !== null ? ` (ROI ${pct(t.roi)})` : ''}.`;
     if (t.closing.legs) {
       answer += ` Closing prices recorded for ${t.closing.legs} selection${t.closing.legs === 1 ? '' : 's'}: `

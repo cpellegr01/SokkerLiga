@@ -161,7 +161,7 @@ function SlipDrawer() {
                     or a percentage or cents (68% or 68¢).</span>
                 </label>
                 {l.odds && (p
-                  ? <span className="subtle">Read as {describeOdds(p.decimal)}: every {formatMoney(100, currency)} staked pays back {formatMoney(Math.round(p.decimal * 100), currency)} if it wins
+                  ? <span className="subtle">Read as {describeOdds(p.decimal)}: every {formatMoney(100, currency)} bet pays back {formatMoney(Math.round(p.decimal * 100), currency)} if it wins
                     {l.fairOdds ? <ValueNote odds={p.decimal} fair={l.fairOdds} /> : null}</span>
                   : <OddsHint text={l.odds} onUse={(v) => setLeg(i, { odds: v })} />)}
               </div>
@@ -176,13 +176,13 @@ function SlipDrawer() {
           {draft.legs.length > 0 && (
             <>
               <div className="slip-row">
-                <label className="slip-field">Stake ({currency})
+                <label className="slip-field">Bet ({currency})
                   <input value={draft.stake} inputMode="decimal" placeholder="10.00" onChange={(e) => set({ stake: e.target.value })} />
                   <span className="subtle">The amount you put on the bet — what you lose if it loses.</span>
                   {payout && <span className="subtle">If it wins you get {formatMoney(payout, currency)} back: your {formatMoney(stakeMinor, currency)} plus {formatMoney(payout - stakeMinor, currency)} profit.</span>}
                   {plan && !draft.editingId && (
                     <span className="suggested subtle">
-                      Your plan suggests {formatMoney(plan.suggestedStakeMinor, currency)}
+                      Your plan suggests a bet of {formatMoney(plan.suggestedStakeMinor, currency)}
                       {plan.suggestedStakeMinor > 0 && (
                         <button type="button" className="link-button" onClick={() => set({ stake: (plan.suggestedStakeMinor / 100).toFixed(2) })}>Use it</button>
                       )}

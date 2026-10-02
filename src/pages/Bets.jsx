@@ -42,7 +42,7 @@ function BetCard({ bet, onChanged }) {
           <div className="subtle">Placed {longDate(bet.placedAt)}</div>
         </div>
         <div className="bet-figures">
-          <span>Stake {formatMoney(bet.stakeMinor, bet.currency)}</span>
+          <span>Bet {formatMoney(bet.stakeMinor, bet.currency)}</span>
           <span>Odds {bet.totalOdds.toFixed(2)}</span>
           {bet.outcome === 'pending'
             ? <span>Returns {formatMoney(bet.potentialPayoutMinor, bet.currency)}</span>

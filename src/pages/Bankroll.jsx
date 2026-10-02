@@ -6,8 +6,8 @@ import DatePicker from '../components/DatePicker.jsx';
 import { useApi, Page, Loading, ErrorBanner, Empty, Profit } from '../components/ui.jsx';
 
 const METHOD = {
-  flat: ['Flat stake', 'The same stake every bet.'],
-  percent: ['Percent of balance', 'A fixed share of the current balance, so stakes shrink after losses and grow after wins.'],
+  flat: ['Flat bet', 'The same amount every bet.'],
+  percent: ['Percent of balance', 'A fixed share of the current balance, so bets shrink after losses and grow after wins.'],
   unit: ['Units', 'A fixed unit; the suggestion is one unit.'],
 };
 
@@ -16,7 +16,7 @@ export default function Bankroll() {
   const [adding, setAdding] = useState(null);
   return (
     <Page title="Bankroll"
-      subtitle="Optional. Set a starting amount and a staking plan, and the bet slip suggests a stake and warns when too much is riding on open bets. Nothing here ever raises a stake to chase a loss.">
+      subtitle="Optional. Set a starting amount and a staking plan, and the bet slip suggests how much to bet and warns when too much is riding on open bets. Nothing here ever raises a bet to chase a loss.">
       <ErrorBanner error={error} />
       {loading && !data ? <Loading /> : data && (
         <>
@@ -56,7 +56,7 @@ function BankrollCard({ b, onChanged }) {
         <Kpi label="Profit from bets" value={<Profit minor={b.profitMinor} currency={b.currency} format={formatMoney} />} />
         <Kpi label={`Open bets (${b.openBets})`} value={money(b.exposureMinor)}
           note={b.exposurePct === null ? null : `${b.exposurePct.toFixed(1)}% of balance; limit ${s.maxExposurePct}%`} />
-        <Kpi label="Suggested stake" value={money(b.suggestedStakeMinor)}
+        <Kpi label="Suggested bet" value={money(b.suggestedStakeMinor)}
           note={b.cappedByExposure ? 'Reduced: open bets are near your limit' : describePlan(s, b.currency)} />
       </div>
       <p className="subtle">
@@ -134,7 +134,7 @@ function SettingsForm({ currency, current, onDone, onCancel }) {
           </select>
           <span className="subtle">{METHOD[form.method][1]}</span>
         </label>
-        <label className="slip-field">{form.method === 'percent' ? 'Percent of balance' : form.method === 'flat' ? 'Stake' : 'Unit size'}
+        <label className="slip-field">{form.method === 'percent' ? 'Percent of balance' : form.method === 'flat' ? 'Bet amount' : 'Unit size'}
           <input value={form.amount} inputMode="decimal" placeholder={form.method === 'percent' ? '2' : '10.00'} onChange={(e) => set({ amount: e.target.value })} />
         </label>
         <label className="slip-field">Limit on open bets (% of balance)

@@ -152,7 +152,7 @@ describe('Recording bets', () => {
 
   test('bad input is refused with a reason', () => {
     assert.throws(() => createBet(db, 'u1', single({ sportsbook: 'nope' })), /betting app/);
-    assert.throws(() => createBet(db, 'u1', single({ stake: '0' })), /stake/);
+    assert.throws(() => createBet(db, 'u1', single({ stake: '0' })), /how much you bet/);
     assert.throws(() => createBet(db, 'u1', single({ legs: [{ matchId: league.upcomingId, market: 'match_result', selection: 'home', odds: 'x' }] })), /Not valid odds/);
     assert.throws(() => createBet(db, 'u1', single({ legs: [{ matchId: league.upcomingId, market: 'over_under', selection: 'over', odds: '2' }] })), /needs a line/);
     assert.throws(() => createBet(db, 'u1', single({ legs: [{ matchId: league.upcomingId, market: 'btts', selection: 'home', odds: '2' }] })), /not a valid choice/);
