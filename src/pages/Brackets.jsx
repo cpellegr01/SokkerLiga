@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import * as api from '../api.js';
 import { href, go } from '../router.js';
-import { shortDate } from '../format.js';
+import { kickoff } from '../format.js';
 import { useApi, Page, Loading, ErrorBanner, Empty, Crest } from '../components/ui.jsx';
 
 /** Knockout brackets: pick a competition, see its rounds side by side. */
@@ -65,6 +65,19 @@ export default function Brackets({ id, params }) {
 }
 
 function Tie({ tie, last }) {
+  if (tie.kind === 'projected') {
+    return (
+      <div className={`bracket-tie projected${last ? '' : ' joins'}`}>
+        {tie.slots.map((t, i) => (
+          <div key={i} className="bracket-team">
+            {t.id ? <a className="team-cell" href={href('team', t.id)}><Crest src={t.logo} name={t.name} size={16} /> <span className="team-name">{t.name}</span></a>
+              : <span className="subtle team-name" title={t.placeholder}>{t.placeholder}</span>}
+          </div>
+        ))}
+        <div className="bracket-legs subtle">Not drawn yet</div>
+      </div>
+    );
+  }
   const scoreOf = (t) => (tie.kind === 'series' ? t.wins : tie.legs.some((l) => l.score) ? t.goals : '');
   return (
     <div className={`bracket-tie${last ? '' : ' joins'}`}>
@@ -80,7 +93,7 @@ function Tie({ tie, last }) {
         {tie.legs.map((l, i) => (
           <span key={l.matchId}>{i ? ' · ' : ''}
             <a href={href('match', l.matchId)} title={`${l.home} ${l.score ?? 'v'} ${l.away}`}>
-              {l.score ? `${l.score}${l.pens ? ` (pens ${l.pens})` : ''}` : shortDate(l.kickoffUtc)}
+              {l.score ? `${l.score}${l.pens ? ` (pens ${l.pens})` : ''}` : `Upcoming ${kickoff(l.kickoffUtc)}`}
             </a>
           </span>
         ))}

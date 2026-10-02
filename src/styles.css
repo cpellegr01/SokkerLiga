@@ -587,3 +587,5 @@ input.auto { color: var(--muted); }
 .bracket-extra { max-width: 240px; margin-top: 0.5rem; }
 .bracket-extra h4 { margin: 0 0 0.5rem; }
 @media (max-width: 720px) { .bracket-round { min-width: 190px; flex-basis: 190px; } }
+.bracket-tie.projected { border-style: dashed; background: transparent; }
+.bracket-legs { white-space: normal; overflow: visible; }

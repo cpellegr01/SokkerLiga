@@ -130,10 +130,30 @@ export function bracket(db, competitionId, seasonId = null) {
     main[i].ties = [...ordered, ...pool.sort((a, b) => a.firstKickoff.localeCompare(b.firstKickoff))];
   }
 
+  /* Rounds still to come: halve until the final, each slot waiting for
+   * the winners of two neighbouring ties. Until the fixtures exist this is
+   * the bracket's order, not a confirmed draw. */
+  const NAMES = { 1: 'Final', 2: 'Semi-finals', 4: 'Quarter-finals', 8: 'Round of 16', 16: 'Round of 32' };
+  const label = (t) => t.placeholder ?? t.teams.map((x) => x.name).join(' v ');
+  const projected = [];
+  let prev = main.at(-1)?.ties ?? [];
+  while (prev.length > 1 && (prev.length & (prev.length - 1)) === 0) {
+    const ties = [];
+    for (let i = 0; i < prev.length; i += 2) {
+      ties.push({ key: `p${projected.length}-${i}`, kind: 'projected', decided: false, legs: [],
+        slots: [prev[i], prev[i + 1]].map((t) => {
+          const w = t.teams?.find((x) => x.winner);
+          return w ? { id: w.id, name: w.name, logo: w.logo } : { placeholder: `Winner of ${label(t)}` };
+        }) });
+    }
+    projected.push({ name: NAMES[ties.length] ?? `Round of ${ties.length * 2}`, ties, projected: true });
+    prev = ties.map((t) => ({ placeholder: t.slots.map((x) => x.name ?? x.placeholder.replace(/^Winner of /, '')).join(' / '), teams: null }));
+  }
+
   return {
     competition,
     season: { id: season.id, label: season.label },
-    rounds: main.map(({ name, ties }) => ({ name, ties })),
+    rounds: [...main.map(({ name, ties }) => ({ name, ties })), ...projected],
     thirdPlace: thirdPlace ? { name: thirdPlace.name, ties: thirdPlace.ties } : null,
     qualifying: qualifying.map(({ name, ties }) => ({ name, ties })),
   };

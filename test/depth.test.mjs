@@ -380,5 +380,20 @@ describe('Brackets', () => {
     const t25 = qf.find((t) => t.teams.some((x) => x.id === T[5]));
     assert.deepEqual(t25.teams.map((x) => x.goals), [1, 1]);
     assert.equal(t25.kind, 'two-legs');
+
+    /* Another cup with only its quarter-finals known: the semis and final
+     * are shown as waiting for winners. */
+    const cup = db.prepare("SELECT id FROM competitions WHERE key = 'europa-league'").get().id;
+    const s2 = Number(db.prepare(`INSERT INTO seasons (competition_id, year, label, start_date, end_date, is_current)
+                                  VALUES (?, 2025, '2025/26', '2025-07-01', '2026-06-01', 1)`).run(cup).lastInsertRowid);
+    const one = (h, a, hg, ag) => db.prepare(`INSERT INTO matches (season_id, round, kickoff_utc, home_team_id, away_team_id, status_key,
+        home_goals, away_goals, source_key, source_ref, fetched_at) VALUES (?, 'Quarter-finals', '2026-04-01T20:00:00.000Z', ?, ?, ?, ?, ?, 'api-football', ?, ?)`)
+      .run(s2, T[h], T[a], hg === null ? 'scheduled' : 'finished', hg, ag, `el${h}${a}`, now());
+    one(0, 1, 2, 0); one(2, 3, null, null); one(4, 5, 0, 1); one(6, 7, null, null);
+    const p = bracket(db, cup);
+    assert.deepEqual(p.rounds.map((r) => r.name), ['Quarter-finals', 'Semi-finals', 'Final']);
+    assert.equal(p.rounds[1].ties[0].slots[0].id, T[0], 'a decided tie sends its winner on');
+    assert.match(p.rounds[1].ties[0].slots[1].placeholder, /^Winner of /);
+    assert.equal(p.rounds[2].ties.length, 1);
   });
 });
