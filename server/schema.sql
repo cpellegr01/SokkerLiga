@@ -939,3 +939,19 @@ CREATE TRIGGER IF NOT EXISTS bankroll_ledger_immutable BEFORE UPDATE ON bankroll
 BEGIN SELECT RAISE(ABORT, 'Ledger entries cannot be changed; add a correcting entry.'); END;
 CREATE TRIGGER IF NOT EXISTS bankroll_ledger_no_delete BEFORE DELETE ON bankroll_ledger
 BEGIN SELECT RAISE(ABORT, 'Ledger entries cannot be deleted; add a correcting entry.'); END;
+
+-- Everything the provider covers, refreshed weekly, so Settings can offer
+-- any league or cup. Switching one on copies it into competitions.
+CREATE TABLE IF NOT EXISTS provider_leagues (
+  source_key   TEXT NOT NULL,
+  source_ref   INTEGER NOT NULL,
+  name         TEXT NOT NULL,
+  type         TEXT,                 -- League / Cup
+  country_name TEXT,
+  country_code TEXT,
+  logo_url     TEXT,
+  flag_url     TEXT,
+  season_year  INTEGER,
+  fetched_at   TEXT NOT NULL,
+  PRIMARY KEY (source_key, source_ref)
+);

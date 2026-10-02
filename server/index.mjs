@@ -16,6 +16,7 @@ import { identityFrom, recordVisit } from './identity.mjs';
 import {
   dashboard, listMatches, matchCenter, teamProfile, playerProfile, listPlayers, listTeams,
   listCompetitions, competitionDetail, setCompetitionEnabled, search, favourites, setFavourite, matchPlayers,
+  leagueCatalog, enableFromCatalog,
 } from './queries.mjs';
 import { syncStatus, requestRun } from './jobs.mjs';
 import {
@@ -199,6 +200,13 @@ async function handleApi(req, res, url) {
   }
 
   if (path === '/api/competitions' && method === 'GET') return send(res, 200, listCompetitions(db));
+  if (path === '/api/league-catalog' && method === 'GET') return send(res, 200, leagueCatalog(db));
+  if (path === '/api/competitions' && method === 'POST') {
+    const body = await readJson(req);
+    enableFromCatalog(db, body.apiFootballId);
+    for (const job of ['sync_competitions', 'sync_teams', 'sync_fixtures', 'sync_standings', 'sync_squads']) requestRun(db, job);
+    return send(res, 200, listCompetitions(db));
+  }
   m = path.match(/^\/api\/competitions\/(\d+)$/);
   if (m && method === 'GET') {
     const result = competitionDetail(db, m[1], q.season);

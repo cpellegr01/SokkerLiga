@@ -560,3 +560,10 @@ input.auto { color: var(--muted); }
 .bet-card .bet-top { padding-right: 84px; }
 @media (max-width: 720px) { .bet-card .bet-top { padding-right: 96px; } }
 .facts dd { white-space: nowrap; }
+.catalog-search { width: 100%; margin-bottom: 0.6rem; }
+.catalog-country { border-top: 1px solid var(--border); }
+.catalog-country summary { display: flex; justify-content: space-between; align-items: center; padding: 0.5rem 0; cursor: pointer; list-style: none; }
+.catalog-country summary::-webkit-details-marker { display: none; }
+.catalog-country summary::before { content: '›'; margin-right: 0.5rem; color: var(--muted); transition: transform 0.15s; }
+.catalog-country[open] summary::before { transform: rotate(90deg); }
+.catalog-country summary .team-cell { flex: 1; }

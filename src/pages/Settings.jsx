@@ -102,7 +102,7 @@ export default function Settings() {
       <ErrorBanner error={comps.error} />
       {!comps.data ? <Loading /> : (
         <div className="card">
-          {comps.data.map((c) => (
+          {comps.data.filter((c) => c.isEnabled).map((c) => (
             <label key={c.id} className="setting-row">
               <span className="team-cell"><Crest src={c.logo} name={c.name} size={20} /> {c.name}
                 <span className="subtle small"> {c.country}{c.season ? ` · ${c.season.label}` : ''}</span></span>
@@ -111,6 +111,7 @@ export default function Settings() {
           ))}
         </div>
       )}
+      <LeagueCatalog onChanged={comps.reload} />
     </Page>
   );
 }
@@ -208,6 +209,64 @@ function BettingApps() {
           <button type="submit" disabled={!name.trim()}>Add</button>
         </form>
       </div>
+    </>
+  );
+}
+
+/* Every league and cup API-Football covers, by country, with a search. */
+function LeagueCatalog({ onChanged }) {
+  const { data, error, reload } = useApi(() => api.leagueCatalog(), []);
+  const [q, setQ] = useState('');
+  const [busy, setBusy] = useState(null);
+  const [err, setErr] = useState(null);
+  const toggle = async (l) => {
+    setBusy(l.apiId);
+    setErr(null);
+    try {
+      if (l.isEnabled) await api.setCompetitionEnabled(l.competitionId, false);
+      else if (l.competitionId) await api.setCompetitionEnabled(l.competitionId, true);
+      else await api.enableFromCatalog(l.apiId);
+      reload();
+      onChanged();
+    } catch (e) { setErr(e.message); } finally { setBusy(null); }
+  };
+  const term = q.trim().toLowerCase();
+  const shown = (data ?? []).filter((l) => !term || `${l.name} ${l.country}`.toLowerCase().includes(term));
+  const byCountry = new Map();
+  for (const l of shown) {
+    if (!byCountry.has(l.country)) byCountry.set(l.country, []);
+    byCountry.get(l.country).push(l);
+  }
+  return (
+    <>
+      <h2>All leagues and cups</h2>
+      <p className="subtle">Everything API-Football covers{data ? ` — ${data.length.toLocaleString()} competitions` : ''}. Each one switched on
+        uses a few more requests a day.</p>
+      <ErrorBanner error={error ?? err} />
+      {!data ? <Loading /> : !data.length ? (
+        <p className="subtle">The list has not been fetched yet: run "League catalogue" under Data sync above.</p>
+      ) : (
+        <div className="card pad">
+          <input type="search" placeholder="Search by league or country, e.g. Nations League or Brazil" value={q}
+            onChange={(e) => setQ(e.target.value)} aria-label="Search leagues" className="catalog-search" />
+          {[...byCountry].map(([country, leagues]) => (
+            <details key={country} className="catalog-country" open={!!term && byCountry.size <= 8}>
+              <summary>
+                <span className="team-cell"><Crest src={leagues[0].flag} name={country} size={16} /> {country}</span>
+                <span className="subtle">{leagues.filter((l) => l.isEnabled).length ? `${leagues.filter((l) => l.isEnabled).length} on · ` : ''}{leagues.length}</span>
+              </summary>
+              {leagues.map((l) => (
+                <label key={l.apiId} className="setting-row">
+                  <span className="team-cell"><Crest src={l.logo} name={l.name} size={18} /> {l.name}
+                    <span className="subtle small"> {l.type === 'Cup' ? 'Cup' : 'League'}</span></span>
+                  <input type="checkbox" checked={l.isEnabled} disabled={busy === l.apiId} onChange={() => toggle(l)} />
+                </label>
+              ))}
+            </details>
+          ))}
+          {!shown.length && <p className="subtle">Nothing matches "{q}".</p>}
+        </div>
+      )}
     </>
   );
 }

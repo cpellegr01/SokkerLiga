@@ -112,6 +112,27 @@ async function fetchDetails(ctx, matchRows) {
 /* ---------------------------------------------------------------- jobs */
 
 export const JOBS = {
+  async sync_league_catalog(ctx) {
+    const { db, provider } = ctx;
+    const { items, fetchedAt } = await provider.leagueCatalog();
+    ctx.recordsIn = items.length;
+    const up = db.prepare(`INSERT INTO provider_leagues (source_key, source_ref, name, type, country_name, country_code, logo_url,
+                             flag_url, season_year, fetched_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                           ON CONFLICT(source_key, source_ref) DO UPDATE SET name = excluded.name, type = excluded.type,
+                             country_name = excluded.country_name, country_code = excluded.country_code, logo_url = excluded.logo_url,
+                             flag_url = excluded.flag_url, season_year = excluded.season_year, fetched_at = excluded.fetched_at`);
+    transaction(db, () => {
+      for (const it of items) {
+        if (!it.league?.id) continue;
+        const season = (it.seasons ?? []).find((x) => x.current) ?? it.seasons?.at(-1);
+        up.run(SOURCE_KEY, it.league.id, it.league.name, it.league.type ?? null, it.country?.name ?? null, it.country?.code ?? null,
+          it.league.logo ?? null, it.country?.flag ?? null, season?.year ?? null, fetchedAt);
+        ctx.recordsWritten += 1;
+      }
+    });
+    ctx.message = `${items.length} leagues and cups available.`;
+  },
+
   async sync_competitions(ctx) {
     const { db, provider } = ctx;
     for (const c of enabledCompetitions(db)) {

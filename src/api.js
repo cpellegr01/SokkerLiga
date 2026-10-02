@@ -69,3 +69,5 @@ export const setClosingOdds = (betId, legId, closingOdds) =>
 export const ask = (question) => request('/ask', { method: 'POST', body: JSON.stringify({ question }) });
 export const matchPlayers = (id) => request(`/matches/${id}/players`);
 export const useCalculatedResult = (id) => request(`/bets/${id}/calculated`, { method: 'POST' });
+export const leagueCatalog = () => request('/league-catalog');
+export const enableFromCatalog = (apiFootballId) => request('/competitions', { method: 'POST', body: JSON.stringify({ apiFootballId }) });

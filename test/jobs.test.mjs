@@ -16,7 +16,7 @@ const count = (table, where = '1=1', ...args) => db.prepare(`SELECT COUNT(*) AS 
 
 describe('Data-refresh jobs', () => {
   test('every job is due on a fresh database, in order, except the manual backfill', () => {
-    assert.deepEqual(dueJobs(db), ['sync_competitions', 'sync_teams', 'sync_fixtures', 'sync_results',
+    assert.deepEqual(dueJobs(db), ['sync_league_catalog', 'sync_competitions', 'sync_teams', 'sync_fixtures', 'sync_results',
       'grade_and_settle', 'sync_standings', 'sync_squads', 'sync_players', 'sync_injuries', 'backtest_model', 'calibrate_and_train']);
   });
 

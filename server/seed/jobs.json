@@ -94,5 +94,13 @@
     "ordinal": 12,
     "quota_priority": "essential",
     "description": "Refits the calibration for each market, trains the learned challenger and snapshots performance, every six hours. No provider requests."
+  },
+  {
+    "key": "sync_league_catalog",
+    "name": "League catalogue",
+    "interval_minutes": 10080,
+    "ordinal": 0,
+    "quota_priority": "normal",
+    "description": "Every league and cup API-Football covers, so any of them can be switched on in Settings. One request a week."
   }
 ]

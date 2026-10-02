@@ -581,3 +581,35 @@ export function matchPlayers(db, id) {
     away: { name: m.away, players: squad.all(since, m.kickoff_utc, m.away_team_id) },
   };
 }
+
+/* ---------------------------------------------------- league catalogue */
+
+/** Every league and cup the provider covers, with whether it is switched on. */
+export function leagueCatalog(db) {
+  return db.prepare(`
+    SELECT p.source_ref AS apiId, p.name, p.type, COALESCE(p.country_name, 'World') AS country, p.logo_url AS logo,
+           p.flag_url AS flag, c.id AS competitionId, COALESCE(c.is_enabled, 0) AS isEnabled
+    FROM provider_leagues p LEFT JOIN competitions c ON c.api_football_id = p.source_ref
+    WHERE p.source_key = 'api-football'
+    ORDER BY CASE WHEN p.country_name IN ('World', 'Europe') THEN 0 ELSE 1 END, p.country_name, p.type DESC, p.name`).all()
+    .map((r) => ({ ...r, isEnabled: !!r.isEnabled }));
+}
+
+/** Switch on any league from the catalogue (added to competitions the first time). */
+export function enableFromCatalog(db, apiId) {
+  const p = db.prepare("SELECT * FROM provider_leagues WHERE source_key = 'api-football' AND source_ref = ?").get(Number(apiId));
+  if (!p) throw new ValidationError('That league is not in the catalogue.', 404);
+  const existing = db.prepare('SELECT id FROM competitions WHERE api_football_id = ?').get(p.source_ref);
+  if (existing) {
+    db.prepare('UPDATE competitions SET is_enabled = 1 WHERE id = ?').run(existing.id);
+    return existing.id;
+  }
+  const slug = (x) => String(x ?? '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  const country = p.country_name ?? 'World';
+  const kind = country === 'World' || country === 'Europe' ? (/nations|world cup|euro|friendl|qualif/i.test(p.name) ? 'international' : 'continental')
+    : p.type === 'Cup' ? 'cup' : 'league';
+  return Number(db.prepare(`INSERT INTO competitions (key, name, country_code, country_name, kind, logo_url, flag_url, is_enabled, ordinal, api_football_id)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, 1, 500, ?)`)
+    .run(`${slug(country)}-${slug(p.name)}-${p.source_ref}`, p.name, p.country_code ?? '', country, kind, p.logo_url, p.flag_url, p.source_ref)
+    .lastInsertRowid);
+}

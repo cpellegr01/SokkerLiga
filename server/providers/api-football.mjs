@@ -160,6 +160,8 @@ export function createClient({ db, apiKey, fetchImpl = fetch, now = () => new Da
     get requestsUsed() { return requestsThisRun; },
 
     leagues: (leagueId) => all('/leagues', { id: leagueId }),
+    /* Every league and cup with a season running now — one request. */
+    leagueCatalog: () => all('/leagues', { current: 'true' }),
     teams: (leagueId, season) => all('/teams', { league: leagueId, season }),
     fixtures: (leagueId, season) => all('/fixtures', { league: leagueId, season }),
     /* Up to 20 fixtures, each with its events, lineups, statistics and

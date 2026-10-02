@@ -320,3 +320,25 @@ describe('Hand corrections and the calculated result', () => {
     assert.deepEqual([edited.profitMinor, edited.settledBy], [420, 'auto']);
   });
 });
+
+describe('League catalogue', () => {
+  test('any league the provider covers can be switched on', async () => {
+    const { leagueCatalog, enableFromCatalog } = await import('../server/queries.mjs');
+    const items = [
+      { league: { id: 5, name: 'UEFA Nations League', type: 'Cup', logo: 'l5' }, country: { name: 'World', code: null, flag: null }, seasons: [{ year: 2026, current: true }] },
+      { league: { id: 71, name: 'Serie A', type: 'League', logo: 'l71' }, country: { name: 'Brazil', code: 'BR', flag: 'br' }, seasons: [{ year: 2026, current: true }] },
+      { league: { id: 999, name: 'Copa Teste', type: 'Cup', logo: 'l999' }, country: { name: 'Brazil', code: 'BR', flag: 'br' }, seasons: [{ year: 2026, current: true }] },
+    ];
+    const provider = { requestsUsed: 1, leagueCatalog: async () => ({ items, fetchedAt: now() }) };
+    const run = await runJob(db, 'sync_league_catalog', { providerFactory: () => provider });
+    assert.equal(run.status, 'ok');
+    const cat = leagueCatalog(db);
+    assert.equal(cat.length, 3);
+    assert.equal(cat.find((l) => l.apiId === 5).isEnabled, true, 'Nations League is a seeded competition, already on');
+    assert.equal(cat.find((l) => l.apiId === 999).isEnabled, false);
+    const id = enableFromCatalog(db, 999);
+    const c = db.prepare('SELECT * FROM competitions WHERE id = ?').get(id);
+    assert.deepEqual([c.name, c.kind, c.is_enabled, c.api_football_id], ['Copa Teste', 'cup', 1, 999]);
+    assert.equal(enableFromCatalog(db, 999), id, 'switching on twice reuses the row');
+  });
+});
