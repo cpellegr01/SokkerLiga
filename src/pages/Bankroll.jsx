@@ -3,7 +3,7 @@ import * as api from '../api.js';
 import { formatMoney, currencyLabel } from '../odds.js';
 import { shortDate } from '../format.js';
 import DatePicker from '../components/DatePicker.jsx';
-import { useApi, Page, Loading, ErrorBanner, Empty, Profit } from '../components/ui.jsx';
+import { useApi, Page, Loading, ErrorBanner, Empty, Profit, MoneyInput } from '../components/ui.jsx';
 
 const METHOD = {
   flat: ['Flat bet', 'The same amount every bet.'],
@@ -121,7 +121,7 @@ function SettingsForm({ currency, current, onDone, onCancel }) {
           <input value={form.currency} maxLength={3} disabled={!!current} onChange={(e) => set({ currency: e.target.value.toUpperCase() })} />
         </label>
         <label className="slip-field">Starting amount ({currencyLabel(form.currency || 'USD')})
-          <input value={form.starting} inputMode="decimal" placeholder="1000.00" onChange={(e) => set({ starting: e.target.value })} />
+          <MoneyInput currency={form.currency || 'USD'} value={form.starting} placeholder="1000.00" onChange={(e) => set({ starting: e.target.value })} />
         </label>
         <div className="slip-field">Counting bets from
           <DatePicker label="Counting bets from" value={form.startedAt} placeholder="Today" onChange={(v) => set({ startedAt: v })} clearable={false} />
@@ -135,7 +135,7 @@ function SettingsForm({ currency, current, onDone, onCancel }) {
           <span className="subtle">{METHOD[form.method][1]}</span>
         </label>
         <label className="slip-field">{form.method === 'percent' ? 'Percent of balance' : form.method === 'flat' ? `Bet amount (${currencyLabel(form.currency || 'USD')})` : `Unit size (${currencyLabel(form.currency || 'USD')})`}
-          <input value={form.amount} inputMode="decimal" placeholder={form.method === 'percent' ? '2' : '10.00'} onChange={(e) => set({ amount: e.target.value })} />
+          {form.method === 'percent' ? <input value={form.amount} inputMode="decimal" placeholder="2" onChange={(e) => set({ amount: e.target.value })} /> : <MoneyInput currency={form.currency || 'USD'} value={form.amount} placeholder="10.00" onChange={(e) => set({ amount: e.target.value })} />}
         </label>
         <label className="slip-field">Limit on open bets (% of balance)
           <input value={form.maxExposurePct} inputMode="decimal" onChange={(e) => set({ maxExposurePct: e.target.value })} />
@@ -171,7 +171,7 @@ function LedgerForm({ currency, onDone }) {
           </select>
         </label>
         <label className="slip-field">Amount ({currencyLabel(currency)})
-          <input value={form.amount} inputMode="decimal" onChange={(e) => setForm({ ...form, amount: e.target.value })} />
+          <MoneyInput currency={currency} value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} />
         </label>
         <div className="slip-field">Date
           <DatePicker label="Date" value={form.at} placeholder="Today" onChange={(v) => setForm({ ...form, at: v })} />

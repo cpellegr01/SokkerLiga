@@ -4,7 +4,7 @@ import { go } from '../router.js';
 import { parseOdds, describeOdds, parseMoney, formatMoney, oddsHint, parseContractPrice, currencyLabel } from '../odds.js';
 import { MARKET_OPTIONS, selectionLabel } from '../markets.js';
 import { kickoff } from '../format.js';
-import { ErrorBanner } from './ui.jsx';
+import { ErrorBanner, MoneyInput } from './ui.jsx';
 import DatePicker from './DatePicker.jsx';
 
 /* The bet slip: where a bet placed in the betting app is recorded.
@@ -18,7 +18,7 @@ const STORE = 'sokkerliga.betslip';
 const load = () => {
   try { return JSON.parse(localStorage.getItem(STORE)) ?? null; } catch { return null; }
 };
-const emptyDraft = () => ({ editingId: null, legs: [], stake: '', fee: '', byContracts: false, orderAmount: '', contracts: '', contractsAuto: false, limitPrice: '', commission: '', stakeAuto: false, sportsbook: '', placedAt: '', totalOdds: '', notes: '' });
+const emptyDraft = () => ({ editingId: null, legs: [], stake: '', fee: '', byContracts: false, orderAmount: '', avgPrice: '', contracts: '', contractsAuto: false, limitPrice: '', commission: '', stakeAuto: false, sportsbook: '', placedAt: '', totalOdds: '', notes: '' });
 
 export function BetSlipProvider({ children }) {
   const [draft, setDraft] = useState(() => load() ?? emptyDraft());
@@ -44,8 +44,9 @@ export function BetSlipProvider({ children }) {
         editingId: bet.id, stake: (bet.stakeMinor / 100).toFixed(2),
         fee: bet.feeMinor + bet.commissionMinor ? ((bet.feeMinor + bet.commissionMinor) / 100).toFixed(2) : '',
         orderAmount: bet.orderAmountMinor ? (bet.orderAmountMinor / 100).toFixed(2) : '', contractsAuto: false,
+        avgPrice: bet.contracts ? (bet.stakeMinor / bet.contracts / 100).toFixed(2) : '',
         byContracts: !!bet.contracts, contracts: bet.contracts ? String(bet.contracts) : '',
-        limitPrice: bet.limitPrice ? String(Math.round(bet.limitPrice * 10000) / 100) : '', stakeAuto: false,
+        limitPrice: bet.limitPrice ? bet.limitPrice.toFixed(2) : '', stakeAuto: false,
         sportsbook: bet.sportsbook.key,
         placedAt: toLocalInput(bet.placedAt), totalOdds: bet.totalOddsText ?? '', notes: bet.notes ?? '',
         legs: bet.legs.map((l) => ({ matchId: l.matchId, home: l.home, away: l.away, kickoffUtc: l.kickoffUtc,
@@ -116,7 +117,11 @@ function SlipDrawer() {
   const limit = contractMode ? parseContractPrice(draft.limitPrice) : null;
   const payout = hasContracts ? Math.round(contracts * 100) : total && stakeMinor ? Math.round(stakeMinor * total) : null;
   const feeMinor = parseMoney(draft.fee) ?? 0;
-  const contractCost = hasContracts && limit ? Math.round(contracts * limit * 100) : null;
+  /* Filled notional = contracts × the average filled price (or the limit
+   * until the average is known). */
+  const avgPrice = contractMode ? parseContractPrice(draft.avgPrice) : null;
+  const unitPrice = avgPrice ?? limit;
+  const contractCost = hasContracts && unitPrice ? Math.round(contracts * unitPrice * 100) : null;
   const orderMinor = contractMode ? parseMoney(draft.orderAmount) : null;
   /* The bet amount ÷ the limit price fills in the contracts (whole ones),
    * until the contracts are typed by hand. */
@@ -207,7 +212,7 @@ function SlipDrawer() {
                   ? <span className="subtle">Read as {describeOdds(p.decimal)}: every {formatMoney(100, currency)} bet pays back {formatMoney(Math.round(p.decimal * 100), currency)} if it wins
                     {l.fairOdds ? <ValueNote odds={p.decimal} fair={l.fairOdds} /> : null}</span>
                   : <OddsHint text={l.odds} onUse={(v) => setLeg(i, { odds: v })} />)}</>}
-                {contractMode && fillCents && l.fairOdds ? <span className="subtle">At {fillCents}¢<ValueNote odds={100 / fillCents} fair={l.fairOdds} /></span> : null}
+                {contractMode && fillCents && l.fairOdds ? <span className="subtle">At {formatMoney(Math.round(fillCents), currency)} a contract<ValueNote odds={100 / fillCents} fair={l.fairOdds} /></span> : null}
               </div>
             );
           })}
@@ -228,28 +233,28 @@ function SlipDrawer() {
               )}
               {contractMode && (
                 <>
-                  <div className="slip-row">
+                  <p className="subtle">Copy the figures from the filled order in your app; the ones in grey are filled in for you.</p>
+                  <div className="order-grid">
                     <label className="slip-field">Bet ({currencyLabel(currency)})
-                      <input value={draft.orderAmount ?? ''} inputMode="decimal" placeholder="10.00" onChange={(e) => set({ orderAmount: e.target.value })} />
-                      <span className="subtle">The amount you placed the order for.</span>
+                      <MoneyInput currency={currency} value={draft.orderAmount ?? ''} placeholder="10.00" onChange={(e) => set({ orderAmount: e.target.value })} />
                     </label>
                     <label className="slip-field">Contracts
-                      <input value={draft.contracts} inputMode="decimal" placeholder="e.g. 14" onChange={(e) => set({ contracts: e.target.value, contractsAuto: false })} />
-                      {draft.contractsAuto && <span className="subtle">Worked out from the bet and the limit price.</span>}
+                      <input className={draft.contractsAuto ? 'auto' : ''} value={draft.contracts} inputMode="decimal" placeholder="14"
+                        onChange={(e) => set({ contracts: e.target.value, contractsAuto: false })} />
                     </label>
-                    <label className="slip-field">Limit price
-                      <input value={draft.limitPrice ?? ''} inputMode="decimal" placeholder="e.g. 68" onChange={(e) => set({ limitPrice: e.target.value })} />
-                      <span className="subtle">In cents, as on the order: 68 for 68¢.</span>
+                    <label className="slip-field">Limit price ({currencyLabel(currency)})
+                      <MoneyInput currency={currency} value={draft.limitPrice ?? ''} placeholder="0.68" onChange={(e) => set({ limitPrice: e.target.value })} />
                     </label>
-                  </div>
-                  <div className="slip-row">
+                    <label className="slip-field">Average filled price ({currencyLabel(currency)})
+                      <MoneyInput currency={currency} value={draft.avgPrice ?? ''} placeholder={limit ? limit.toFixed(2) : '0.68'}
+                        onChange={(e) => set({ avgPrice: e.target.value, stakeAuto: true })} />
+                    </label>
                     <label className="slip-field">Filled notional ({currencyLabel(currency)})
-                      <input value={draft.stake} inputMode="decimal" placeholder="9.52" onChange={(e) => set({ stake: e.target.value, stakeAuto: false })} />
-                      <span className="subtle">What the contracts cost. Filled in from the limit; change it if the order filled lower.</span>
+                      <MoneyInput currency={currency} className={draft.stakeAuto ? 'auto' : ''} value={draft.stake} placeholder="9.52"
+                        onChange={(e) => set({ stake: e.target.value, stakeAuto: false })} />
                     </label>
-                    <label className="slip-field">Commissions and fees ({currencyLabel(currency)})
-                      <input value={draft.fee} inputMode="decimal" placeholder="0.00" onChange={(e) => set({ fee: e.target.value })} />
-                      <span className="subtle">Both together, as one amount.</span>
+                    <label className="slip-field">Commissions &amp; fees ({currencyLabel(currency)})
+                      <MoneyInput currency={currency} value={draft.fee} placeholder="0.28" onChange={(e) => set({ fee: e.target.value })} />
                     </label>
                   </div>
                   <OrderSummary order={orderMinor} contracts={hasContracts ? contracts : null} limit={limit} notional={stakeMinor}
@@ -258,7 +263,7 @@ function SlipDrawer() {
               )}
               {!contractMode && <div className="slip-row">
                 <label className="slip-field">Bet ({currencyLabel(currency)})
-                  <input value={draft.stake} inputMode="decimal" placeholder="10.00" onChange={(e) => set({ stake: e.target.value, stakeAuto: false })} />
+                  <MoneyInput currency={currency} value={draft.stake} placeholder="10.00" onChange={(e) => set({ stake: e.target.value, stakeAuto: false })} />
                   <span className="subtle">The amount you put on the bet — what you lose if it loses.</span>
                   {payout && (
                     <span className="subtle">
@@ -282,7 +287,7 @@ function SlipDrawer() {
                   )}
                 </label>
                 <label className="slip-field">Fees ({currencyLabel(currency)}, optional)
-                  <input value={draft.fee} inputMode="decimal" placeholder="0.00" onChange={(e) => set({ fee: e.target.value })} />
+                  <MoneyInput currency={currency} value={draft.fee} placeholder="0.00" onChange={(e) => set({ fee: e.target.value })} />
                   <span className="subtle">Any fee the app charged on top of the bet. It is counted as spent whatever the result.</span>
                 </label>
               </div>}
@@ -318,7 +323,7 @@ function SlipDrawer() {
         {draft.legs.length > 0 && (
           <footer className="slip-footer">
             <div className="slip-summary">
-              <span>{draft.legs.length > 1 ? `Parlay of ${draft.legs.length}` : 'Single'} · {contractMode ? (fillCents ? `${contracts} contracts at ${fillCents}¢` : 'contracts') : `odds ${total ? total.toFixed(2) : '—'}`}</span>
+              <span>{draft.legs.length > 1 ? `Parlay of ${draft.legs.length}` : 'Single'} · {contractMode ? (fillCents ? `${contracts} contracts at ${formatMoney(Math.round(fillCents), currency)}` : 'contracts') : `odds ${total ? total.toFixed(2) : '—'}`}</span>
               <span>{feeMinor ? `Costs ${formatMoney((stakeMinor ?? 0) + feeMinor, currency)} · ` : ''}Returns {payout ? formatMoney(payout, currency) : '—'}</span>
             </div>
             {error && <span className="danger">{error}</span>}
@@ -352,10 +357,10 @@ function OrderSummary({ order, contracts, limit, notional, fees, fillCents, curr
   const rows = [
     ['Bet', order ? m(order) : '—'],
     ['Contracts', contracts ?? '—'],
-    ['Limit price', limit ? `${Math.round(limit * 10000) / 100}¢` : '—'],
-    ['Cost at the limit', contracts && limit ? `${contracts} × ${Math.round(limit * 10000) / 100}¢ = ${m(Math.round(contracts * limit * 100))}` : '—'],
-    ['Filled notional', notional ? `${m(notional)}${fillCents ? ` (${fillCents}¢ a contract)` : ''}` : '—'],
-    ['Commissions and fees', m(fees)],
+    ['Limit price', limit ? m(Math.round(limit * 100)) : '—'],
+    ['Average filled price', fillCents ? m(Math.round(fillCents)) : '—'],
+    ['Filled notional', notional ? m(notional) : '—'],
+    ['Commissions & fees', m(fees)],
   ];
   return (
     <div className="order-summary">

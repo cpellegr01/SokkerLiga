@@ -126,3 +126,13 @@ export function currencyLabel(currency = 'USD') {
     return currency;
   }
 }
+
+/** "$", "€" — the currency's own symbol, for inside money fields. */
+export function currencySymbol(currency = 'USD') {
+  try {
+    return new Intl.NumberFormat(undefined, { style: 'currency', currency, currencyDisplay: 'narrowSymbol' })
+      .formatToParts(0).find((p) => p.type === 'currency')?.value ?? currency;
+  } catch {
+    return currency;
+  }
+}

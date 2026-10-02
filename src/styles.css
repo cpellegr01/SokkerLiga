@@ -526,3 +526,9 @@ textarea { padding: 0.45rem 0.6rem; border: 1px solid var(--border); border-radi
 .order-summary > div { display: flex; justify-content: space-between; gap: 0.75rem; }
 .order-summary > div > span:last-child { text-align: right; font-variant-numeric: tabular-nums; }
 .order-total { border-top: 1px solid var(--border); padding-top: 0.35rem; }
+.order-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; }
+.order-grid input { width: 100%; }
+input.auto { color: var(--muted); }
+.money-input { position: relative; display: block; width: 100%; }
+.money-input .money-prefix { position: absolute; left: 0.6rem; top: 50%; transform: translateY(-50%); color: var(--muted); pointer-events: none; }
+.money-input input { width: 100%; padding-left: 1.5rem; }

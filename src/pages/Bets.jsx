@@ -4,7 +4,7 @@ import { href } from '../router.js';
 import { kickoff, longDate } from '../format.js';
 import { formatMoney, currencyLabel } from '../odds.js';
 import { OUTCOME_LABEL } from '../markets.js';
-import { useApi, Page, Loading, ErrorBanner, Empty, Tabs, OutcomeBadge, Profit, DecisionBadge } from '../components/ui.jsx';
+import { useApi, Page, Loading, ErrorBanner, Empty, Tabs, OutcomeBadge, Profit, DecisionBadge, MoneyInput } from '../components/ui.jsx';
 import { useSlip } from '../components/BetSlip.jsx';
 
 export default function Bets() {
@@ -45,7 +45,7 @@ function BetCard({ bet, onChanged }) {
           {bet.contracts ? (
             <>
               {bet.orderAmountMinor && <span>Bet {formatMoney(bet.orderAmountMinor, bet.currency)}</span>}
-              <span>{bet.contracts} contract{bet.contracts === 1 ? '' : 's'}{bet.limitPrice ? ` · limit ${Math.round(bet.limitPrice * 10000) / 100}¢` : ''}</span>
+              <span>{bet.contracts} contract{bet.contracts === 1 ? '' : 's'}{bet.limitPrice ? ` · limit ${formatMoney(Math.round(bet.limitPrice * 100), bet.currency)}` : ''}</span>
               <span>Filled notional {formatMoney(bet.stakeMinor, bet.currency)}</span>
             </>
           ) : <span>Bet {formatMoney(bet.stakeMinor, bet.currency)}</span>}
@@ -158,7 +158,7 @@ function CorrectForm({ bet, onDone }) {
           </select>
         </label>
         <label className="slip-field">Profit or loss ({currencyLabel(bet.currency)}, optional)
-          <input value={profit} inputMode="decimal" placeholder="Worked out if empty" onChange={(e) => setProfit(e.target.value)} />
+          <MoneyInput currency={bet.currency} value={profit} placeholder="Worked out if empty" onChange={(e) => setProfit(e.target.value)} />
         </label>
       </div>
       <label className="slip-field">Why

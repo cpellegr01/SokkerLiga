@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { href } from '../router.js';
 import { kickoffTime, kickoffDay, STATUS_LABEL } from '../format.js';
 import { STANCE_LABEL, OUTCOME_LABEL } from '../markets.js';
+import { currencySymbol } from '../odds.js';
 
 /* ----------------------------------------------------------- data hook */
 
@@ -254,4 +255,14 @@ export function Profit({ minor, currency, format }) {
   if (minor === null || minor === undefined) return <span className="subtle">—</span>;
   const cls = minor > 0 ? 'profit-up' : minor < 0 ? 'profit-down' : '';
   return <span className={cls}>{minor > 0 ? '+' : ''}{format(minor, currency)}</span>;
+}
+
+/** A money field with the currency symbol inside it: [$ 10.00]. */
+export function MoneyInput({ currency = 'USD', className = '', ...props }) {
+  return (
+    <span className="money-input">
+      <span className="money-prefix" aria-hidden="true">{currencySymbol(currency)}</span>
+      <input inputMode="decimal" {...props} className={className} />
+    </span>
+  );
 }
