@@ -1,0 +1,10 @@
+[
+  { "key": "scheduled", "name": "Scheduled", "is_final": 0, "is_live": 0, "ordinal": 1 },
+  { "key": "live",      "name": "Live",      "is_final": 0, "is_live": 1, "ordinal": 2 },
+  { "key": "finished",  "name": "Finished",  "is_final": 1, "is_live": 0, "ordinal": 3 },
+  { "key": "postponed", "name": "Postponed", "is_final": 0, "is_live": 0, "ordinal": 4 },
+  { "key": "suspended", "name": "Suspended", "is_final": 0, "is_live": 0, "ordinal": 5 },
+  { "key": "abandoned", "name": "Abandoned", "is_final": 1, "is_live": 0, "ordinal": 6 },
+  { "key": "cancelled", "name": "Cancelled", "is_final": 1, "is_live": 0, "ordinal": 7 },
+  { "key": "awarded",   "name": "Awarded",   "is_final": 1, "is_live": 0, "ordinal": 8 }
+]

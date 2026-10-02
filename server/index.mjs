@@ -1,7 +1,9 @@
 /* SokkerLiga API server.
  *
  * No dependencies: node:http and node:sqlite only. Sign-in is the Conforza
- * front door's job — see server/identity.mjs.
+ * front door's job — see server/identity.mjs. This process only reads the
+ * database and records requests; every provider call happens in the worker
+ * (server/worker.mjs), so a slow provider never holds up a page.
  */
 
 import { createServer } from 'node:http';
@@ -11,6 +13,11 @@ import { join, extname, normalize, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { openDatabase, ValidationError } from './db.mjs';
 import { identityFrom, recordVisit } from './identity.mjs';
+import {
+  dashboard, listMatches, matchCenter, teamProfile, playerProfile, listPlayers, listTeams,
+  listCompetitions, competitionDetail, setCompetitionEnabled, search, favourites, setFavourite,
+} from './queries.mjs';
+import { syncStatus, requestRun } from './jobs.mjs';
 import { VERSION } from '../src/version.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -34,17 +41,38 @@ const send = (res, status, body, headers = {}) => {
   res.writeHead(status, {
     'content-type': 'application/json; charset=utf-8',
     'content-length': Buffer.byteLength(payload),
+    'cache-control': 'no-store',
     ...headers,
   });
   res.end(payload);
 };
 
+async function readJson(req) {
+  const chunks = [];
+  let size = 0;
+  for await (const chunk of req) {
+    size += chunk.length;
+    if (size > 100_000) throw new ValidationError('That request is too large.', 413);
+    chunks.push(chunk);
+  }
+  if (!chunks.length) return {};
+  try {
+    return JSON.parse(Buffer.concat(chunks).toString('utf8'));
+  } catch {
+    throw new ValidationError('The request body is not valid JSON.');
+  }
+}
+
+const notFound = (res, what) => send(res, 404, { error: `That ${what} does not exist.` });
+
 async function handleApi(req, res, url) {
   const path = url.pathname;
+  const q = Object.fromEntries(url.searchParams);
+  const method = req.method;
 
   /* Open: Caddy lets the health probe through without asking the front door,
    * so a deploy can be verified without an account. */
-  if (path === '/api/health' && req.method === 'GET') {
+  if (path === '/api/health' && method === 'GET') {
     return send(res, 200, { status: 'ok', version: VERSION });
   }
 
@@ -52,8 +80,62 @@ async function handleApi(req, res, url) {
   if (!person) return send(res, 401, { error: 'Please sign in.' });
   recordVisit(db, person);
 
-  if (path === '/api/me' && req.method === 'GET') {
-    return send(res, 200, { user: person, frontDoor: FRONT_DOOR_URL });
+  if (path === '/api/me' && method === 'GET') {
+    return send(res, 200, { user: person, frontDoor: FRONT_DOOR_URL, favourites: favourites(db, person.id) });
+  }
+
+  if (path === '/api/dashboard' && method === 'GET') {
+    return send(res, 200, dashboard(db, person.id, { dayStart: q.dayStart, dayEnd: q.dayEnd }));
+  }
+
+  if (path === '/api/search' && method === 'GET') return send(res, 200, search(db, q.q));
+
+  if (path === '/api/matches' && method === 'GET') {
+    return send(res, 200, listMatches(db, { ...q, userId: person.id, favouritesOnly: q.favourites === '1' }));
+  }
+
+  let m = path.match(/^\/api\/matches\/(\d+)$/);
+  if (m && method === 'GET') {
+    const result = matchCenter(db, m[1]);
+    return result ? send(res, 200, result) : notFound(res, 'match');
+  }
+
+  if (path === '/api/teams' && method === 'GET') return send(res, 200, listTeams(db, q));
+  m = path.match(/^\/api\/teams\/(\d+)$/);
+  if (m && method === 'GET') {
+    const result = teamProfile(db, m[1]);
+    return result ? send(res, 200, result) : notFound(res, 'team');
+  }
+
+  if (path === '/api/players' && method === 'GET') return send(res, 200, listPlayers(db, q));
+  m = path.match(/^\/api\/players\/(\d+)$/);
+  if (m && method === 'GET') {
+    const result = playerProfile(db, m[1]);
+    return result ? send(res, 200, result) : notFound(res, 'player');
+  }
+
+  if (path === '/api/competitions' && method === 'GET') return send(res, 200, listCompetitions(db));
+  m = path.match(/^\/api\/competitions\/(\d+)$/);
+  if (m && method === 'GET') {
+    const result = competitionDetail(db, m[1], q.season);
+    return result ? send(res, 200, result) : notFound(res, 'competition');
+  }
+  if (m && method === 'PATCH') {
+    const body = await readJson(req);
+    setCompetitionEnabled(db, m[1], !!body.isEnabled);
+    return send(res, 200, listCompetitions(db));
+  }
+
+  m = path.match(/^\/api\/favourites\/(competition|team)\/(\d+)$/);
+  if (m && (method === 'PUT' || method === 'DELETE')) {
+    return send(res, 200, setFavourite(db, person.id, m[1], m[2], method === 'PUT'));
+  }
+
+  if (path === '/api/sync' && method === 'GET') return send(res, 200, syncStatus(db));
+  m = path.match(/^\/api\/sync\/([a-z_]+)\/run$/);
+  if (m && method === 'POST') {
+    if (!requestRun(db, m[1])) return notFound(res, 'job');
+    return send(res, 202, syncStatus(db));
   }
 
   return send(res, 404, { error: 'No such endpoint.' });

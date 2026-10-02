@@ -28,6 +28,10 @@ Environment=PORT=8789
 Environment=HOST=127.0.0.1
 Environment=SOKKERLIGA_DB=/var/lib/sokkerliga/sokkerliga.db
 Environment=CONFORZA_URL=https://conforza.tech
+# Secrets (API_FOOTBALL_KEY, later ANTHROPIC_API_KEY) live outside the repo.
+# systemd reads the file as root before dropping to the sokkerliga user, so
+# it stays 0600 root-only. The leading '-' lets the service start without it.
+EnvironmentFile=-/etc/sokkerliga/sokkerliga.env
 
 ReadWritePaths=/var/lib/sokkerliga
 ProtectSystem=strict

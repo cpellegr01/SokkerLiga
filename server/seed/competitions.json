@@ -1,0 +1,10 @@
+[
+  { "key": "premier-league",   "name": "Premier League",          "country_code": "GB-ENG", "country_name": "England", "kind": "league",      "is_enabled": 1, "ordinal": 1, "api_football_id": 39 },
+  { "key": "la-liga",          "name": "La Liga",                 "country_code": "ES",     "country_name": "Spain",   "kind": "league",      "is_enabled": 1, "ordinal": 2, "api_football_id": 140 },
+  { "key": "bundesliga",       "name": "Bundesliga",              "country_code": "DE",     "country_name": "Germany", "kind": "league",      "is_enabled": 1, "ordinal": 3, "api_football_id": 78 },
+  { "key": "serie-a",          "name": "Serie A",                 "country_code": "IT",     "country_name": "Italy",   "kind": "league",      "is_enabled": 1, "ordinal": 4, "api_football_id": 135 },
+  { "key": "ligue-1",          "name": "Ligue 1",                 "country_code": "FR",     "country_name": "France",  "kind": "league",      "is_enabled": 1, "ordinal": 5, "api_football_id": 61 },
+  { "key": "champions-league", "name": "UEFA Champions League",   "country_code": "EU",     "country_name": "Europe",  "kind": "continental", "is_enabled": 1, "ordinal": 6, "api_football_id": 2 },
+  { "key": "europa-league",    "name": "UEFA Europa League",      "country_code": "EU",     "country_name": "Europe",  "kind": "continental", "is_enabled": 1, "ordinal": 7, "api_football_id": 3 },
+  { "key": "mls",              "name": "Major League Soccer",     "country_code": "US",     "country_name": "USA",     "kind": "league",      "is_enabled": 1, "ordinal": 8, "api_football_id": 253 }
+]

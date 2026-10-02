@@ -6,7 +6,8 @@ decisions:
 1. **Same stack as SAM**: Node 22, Vite, React, SQLite via `node:sqlite`,
    plain JavaScript.
 2. **No odds feed**: football data only.
-3. **Recommendations, not betting**: SokkerLiga never places bets. Claudio
+3. **API-Football is the only data source.**
+4. **Recommendations, not betting**: SokkerLiga never places bets. Claudio
    bets in a separate betting app, then **records the bet in SokkerLiga by
    hand**, with the odds taken. SokkerLiga settles it from the result and
    keeps the betting history.
@@ -85,7 +86,7 @@ server/
   schema.sql             tables, indexes, views, immutability triggers
   seed/*.json            master data: competitions, markets, statuses, stat types
   providers/             one module per source, all implementing §3
-    api-football.mjs  football-data-uk.mjs
+    api-football.mjs
   ingest/                provider records → database rows (idempotent)
   features/              as-of feature builder (no look-ahead)
   models/                probability engines (Dixon–Coles, rate models, …)
@@ -287,7 +288,7 @@ matched with certainty. Nothing is fuzzy-matched silently.
 | Source | Role | Cost | Notes |
 |---|---|---|---|
 | **API-Football** (api-sports.io) | The main source: competitions, fixtures, results, events, lineups, team and player match statistics, injuries, squads, standings, logos and photos | **Pro $19/month**, 7,500 requests/day. The free tier (100/day) covers past seasons only | Covers all 8 competitions. xG appears in match statistics for some competitions only; recorded when present, marked missing otherwise. Images are shown from the provider's servers, not redistributed. |
-| **football-data.co.uk** | Past results and basic match statistics (results since 1993, statistics since 2000) to fit and backtest the statistical model on many seasons cheaply | Free | **Free for private individuals only**, and its terms exclude "data training products using automated bots/scrapers/AI". Plan: files downloaded by hand, used only to fit and test the statistical model, **never sent to Claude**. Claudio to confirm before Phase 2; without it the model is fitted on API-Football history alone (fine, just fewer seasons). |
+| ~~football-data.co.uk~~ | — | — | **Not used** (Claudio, 2026-10-01: API-Football only). The model is fitted on API-Football's own history. |
 | **Anthropic API** | Claude for the written analysis | Usage-based | One call per Analyze Match; tokens and cost logged per run. |
 
 Deliberately **excluded**: scraping FBref, Understat, Transfermarkt or
@@ -609,7 +610,6 @@ Each phase ends deployed and verified at sokkerliga.conforza.tech.
 - Team and player match statistics; derived season statistics.
 - Feature builder with the leakage tests; Dixon–Coles goals model with
   market pricing; corners and cards models.
-- Optional football-data.co.uk history for model fitting (subject to §4).
 - AI abstraction, Claude adapter, versioned prompts; analysis runs,
   immutable predictions, factors, recommendations with thresholds;
   Predictions screen and the Analysis tab.

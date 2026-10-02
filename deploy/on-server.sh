@@ -6,7 +6,6 @@
 set -euo pipefail
 
 APP_DIR=/srv/sokkerliga
-SERVICE=sokkerliga
 
 cd "$APP_DIR"
 
@@ -18,9 +17,18 @@ npm run build --silent
 chown -R sokkerliga:sokkerliga "$APP_DIR"
 
 echo "==> Restarting"
-systemctl restart "$SERVICE"
+systemctl restart sokkerliga
+# The worker exists from v0.2; before its one-time install there is none.
+if systemctl list-unit-files sokkerliga-worker.service >/dev/null 2>&1 \
+   && systemctl list-unit-files sokkerliga-worker.service | grep -q sokkerliga-worker; then
+  systemctl restart sokkerliga-worker
+  sleep 1
+  echo "worker: $(systemctl is-active sokkerliga-worker)"
+else
+  echo "worker: not installed yet (see deploy/setup-worker.sh)"
+fi
 sleep 1
-systemctl is-active "$SERVICE"
+systemctl is-active sokkerliga
 
 echo "==> Version"
 curl -fsS http://127.0.0.1:8789/api/health

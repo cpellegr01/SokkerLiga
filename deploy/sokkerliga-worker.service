@@ -1,0 +1,36 @@
+# SokkerLiga worker — systemd unit.
+#
+# Install to /etc/systemd/system/sokkerliga-worker.service
+#
+# The second process: runs the data-refresh jobs (server/worker.mjs). The
+# API server never calls the data provider itself.
+
+[Unit]
+Description=SokkerLiga worker (data refresh)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=sokkerliga
+Group=sokkerliga
+WorkingDirectory=/srv/sokkerliga
+ExecStart=/usr/bin/node --disable-warning=ExperimentalWarning server/worker.mjs
+
+Restart=on-failure
+RestartSec=10
+# The worker finishes the job it is on before stopping.
+TimeoutStopSec=120
+
+Environment=NODE_ENV=production
+Environment=SOKKERLIGA_DB=/var/lib/sokkerliga/sokkerliga.db
+EnvironmentFile=-/etc/sokkerliga/sokkerliga.env
+
+ReadWritePaths=/var/lib/sokkerliga
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

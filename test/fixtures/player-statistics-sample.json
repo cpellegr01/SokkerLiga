@@ -1,0 +1,55 @@
+{
+ "games": {
+  "minutes": 90,
+  "number": 13,
+  "position": "G",
+  "rating": "6.3",
+  "captain": false,
+  "substitute": false
+ },
+ "offsides": null,
+ "shots": {
+  "total": 0,
+  "on": 0
+ },
+ "goals": {
+  "total": null,
+  "conceded": 1,
+  "assists": null,
+  "saves": 0
+ },
+ "passes": {
+  "total": 17,
+  "key": 0,
+  "accuracy": "68%"
+ },
+ "tackles": {
+  "total": null,
+  "blocks": 0,
+  "interceptions": 0
+ },
+ "duels": {
+  "total": null,
+  "won": null
+ },
+ "dribbles": {
+  "attempts": 0,
+  "success": 0,
+  "past": null
+ },
+ "fouls": {
+  "drawn": 0,
+  "committed": 0
+ },
+ "cards": {
+  "yellow": 0,
+  "red": 0
+ },
+ "penalty": {
+  "won": null,
+  "commited": null,
+  "scored": 0,
+  "missed": 0,
+  "saved": 0
+ }
+}

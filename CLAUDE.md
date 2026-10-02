@@ -16,6 +16,29 @@ to stand in for the front door.
 `people` records each front-door user the first time they are seen, so league
 data can reference people by id.
 
+## Code map (Phase 1)
+
+- `server/providers/api-football.mjs` — the only network code: `createClient()`
+  (raw payloads, quota, pacing, retries) and pure `normalise*()` functions.
+  Response shapes were taken from real samples (see `test/fixtures/`).
+- `server/ingest.mjs` — normalised records → rows. Idempotent; changes to
+  stored facts are copied to `match_revisions` / `team_match_stats_revisions`
+  first; squads use valid_from/valid_to; standings are a dated series.
+- `server/jobs.mjs` — job functions + `runJob` (lock, `job_runs` log,
+  next run) + `dueJobs`. `server/worker.mjs` loops over due jobs.
+- `server/queries.mjs` — read models. Anything looking back from a match is
+  computed **as of its kickoff**.
+- `src/` — hash-routed React UI (`#/match/12`), pages in `src/pages/`.
+
+Deviations from `docs/architecture.md`, deliberately small: no `stages`
+table (round text on matches, group name on standings); logos/photos are
+columns rather than an `images` table; `ingest.mjs`/`jobs.mjs` are single
+files rather than folders.
+
+Match details are fetched with `/fixtures?ids=` (20 matches per request,
+events + lineups + stats + player stats included) — keep it that way, it is
+what keeps the request budget tiny.
+
 ## Run locally
 
     npm install
@@ -27,6 +50,10 @@ data can reference people by id.
 VPS `root@2.25.65.188`. Code `/srv/sokkerliga`, DB
 `/var/lib/sokkerliga/sokkerliga.db`, user/unit `sokkerliga`, port 8789,
 Caddy block `deploy/sokkerliga.caddy` → `/etc/caddy/sites/`.
+
+Two systemd units: `sokkerliga` (API) and `sokkerliga-worker` (jobs). Both
+read `/etc/sokkerliga/sokkerliga.env` (API_FOOTBALL_KEY). One-time setup of
+the worker, secrets file and backup cron: `deploy/setup-worker.sh` (root).
 
 Deploy: bump `src/version.js`, then `./deploy/ship.sh "message"`. The health
 check (`/api/health`) is open, everything else needs a front-door sign-in.

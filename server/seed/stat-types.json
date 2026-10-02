@@ -1,0 +1,20 @@
+[
+  { "key": "shots_on_target",  "name": "Shots on target",   "unit": "count",   "provider_label": "Shots on Goal",     "ordinal": 1 },
+  { "key": "shots_off_target", "name": "Shots off target",  "unit": "count",   "provider_label": "Shots off Goal",    "ordinal": 2 },
+  { "key": "shots",            "name": "Shots",             "unit": "count",   "provider_label": "Total Shots",       "ordinal": 3 },
+  { "key": "shots_blocked",    "name": "Blocked shots",     "unit": "count",   "provider_label": "Blocked Shots",     "ordinal": 4 },
+  { "key": "shots_inside_box", "name": "Shots inside box",  "unit": "count",   "provider_label": "Shots insidebox",   "ordinal": 5 },
+  { "key": "shots_outside_box","name": "Shots outside box", "unit": "count",   "provider_label": "Shots outsidebox",  "ordinal": 6 },
+  { "key": "xg",               "name": "Expected goals",    "unit": "decimal", "provider_label": "expected_goals",    "ordinal": 7 },
+  { "key": "possession",       "name": "Possession",        "unit": "percent", "provider_label": "Ball Possession",   "ordinal": 8 },
+  { "key": "corners",          "name": "Corners",           "unit": "count",   "provider_label": "Corner Kicks",      "ordinal": 9 },
+  { "key": "fouls",            "name": "Fouls",             "unit": "count",   "provider_label": "Fouls",             "ordinal": 10 },
+  { "key": "offsides",         "name": "Offsides",          "unit": "count",   "provider_label": "Offsides",          "ordinal": 11 },
+  { "key": "yellow_cards",     "name": "Yellow cards",      "unit": "count",   "provider_label": "Yellow Cards",      "ordinal": 12 },
+  { "key": "red_cards",        "name": "Red cards",         "unit": "count",   "provider_label": "Red Cards",         "ordinal": 13 },
+  { "key": "saves",            "name": "Goalkeeper saves",  "unit": "count",   "provider_label": "Goalkeeper Saves",  "ordinal": 14 },
+  { "key": "passes",           "name": "Passes",            "unit": "count",   "provider_label": "Total passes",      "ordinal": 15 },
+  { "key": "passes_accurate",  "name": "Accurate passes",   "unit": "count",   "provider_label": "Passes accurate",   "ordinal": 16 },
+  { "key": "pass_accuracy",    "name": "Pass accuracy",     "unit": "percent", "provider_label": "Passes %",          "ordinal": 17 },
+  { "key": "goals_prevented",  "name": "Goals prevented",   "unit": "decimal", "provider_label": "goals_prevented",   "ordinal": 18 }
+]

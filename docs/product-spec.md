@@ -7,7 +7,7 @@ requirement of the original is kept. The design that answers it is in
 ## Scope decisions (2026-10-01) — these override the sections below
 
 1. **Stack**: same as SAM (SQLite), not Next.js/PostgreSQL.
-2. **No odds feed**: football data only.
+2. **No odds feed**: football data only, from **API-Football** alone.
 3. **Recommendations, not betting**: SokkerLiga never places bets; Claudio
    bets in a separate betting app. **Afterwards Claudio records the bet in
    SokkerLiga by hand** (match, market, selection, odds taken, stake, notes).
