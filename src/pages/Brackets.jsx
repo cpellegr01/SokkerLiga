@@ -105,6 +105,10 @@ function BracketColumns({ rounds }) {
     const prev = rounds[i - 1];
     const feeds = next && Math.ceil(r.ties.length / 2) === next.ties.length && r.ties.length > 1;
     const fed = prev && Math.ceil(prev.ties.length / 2) === r.ties.length && prev.ties.length > 1;
+    /* One tie into one tie (the Champions League's round of 32 into the
+     * round of 16): a straight line where the winner goes on at the same row. */
+    const straight = next && next.ties.length === r.ties.length;
+    const straightIn = prev && prev.ties.length === r.ties.length;
     const pairs = [];
     for (let j = 0; j < r.ties.length; j += feeds ? 2 : 1) pairs.push(r.ties.slice(j, feeds ? j + 2 : j + 1));
     return (
@@ -113,9 +117,14 @@ function BracketColumns({ rounds }) {
         <div className="bracket-ties">
           {pairs.map((pair) => (
             <div key={pair[0].key} className={`bracket-pair${feeds && pair.length === 2 ? ' joins' : ''}${feeds && pair.length === 1 ? ' joins-one' : ''}`}>
-              {pair.map((t) => (
-                <div key={t.key} className={`bracket-slot${fed ? ' fed' : ''}`}><Tie tie={t} /></div>
-              ))}
+              {pair.map((t) => {
+                const j = r.ties.indexOf(t);
+                const out = straight && t.next === j;
+                const into = straightIn && prev.ties[j]?.next === j;
+                return (
+                  <div key={t.key} className={`bracket-slot${fed || into ? ' fed' : ''}${out ? ' out-line' : ''}`}><Tie tie={t} /></div>
+                );
+              })}
             </div>
           ))}
         </div>
@@ -153,7 +162,8 @@ function Tie({ tie }) {
       {tie.teams.map((t) => (
         <div key={t.id} className={`bracket-team${t.winner ? ' winner' : tie.decided ? ' out' : ''}`}>
           <a className="team-cell" href={href('team', t.id)}><Crest src={t.logo} name={t.name} size={16} /> <span className="team-name">{t.name}</span></a>
-          <span className="bracket-score">{scoreOf(t)}{t.pens !== null ? <span className="subtle"> ({t.pens})</span> : null}</span>
+          <span className="bracket-score">{scoreOf(t)}{t.pens !== null ? <span className="subtle"> ({t.pens})</span> : null}
+            {t.winner && <span className="bracket-through" aria-label="Through"> ✓</span>}</span>
         </div>
       ))}
       <div className="bracket-legs subtle">

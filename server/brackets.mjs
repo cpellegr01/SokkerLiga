@@ -107,6 +107,9 @@ export function bracket(db, competitionId, seasonId = null) {
     WHERE m.season_id = ? AND m.round IS NOT NULL AND m.status_key NOT IN ('cancelled')
     ORDER BY m.kickoff_utc`).all(season.id);
 
+  /* Knockout rounds played before the group or league phase began are
+   * qualifying, whatever they are called ("Play-offs" in August). */
+  const groupStart = rows.filter((r) => GROUP_ROUND.test(r.round)).map((r) => r.kickoff_utc).sort()[0] ?? null;
   const rounds = new Map();
   for (const r of rows) {
     if (GROUP_ROUND.test(r.round)) continue;
@@ -125,13 +128,16 @@ export function bracket(db, competitionId, seasonId = null) {
       if (!ties.has(k)) ties.set(k, []);
       ties.get(k).push(m);
     }
-    return { name, firstKickoff: matches[0].kickoffUtc, ties: [...ties.values()].map(tieOf) };
+    const lastKickoff = matches[matches.length - 1].kickoffUtc;
+    return { name, firstKickoff: matches[0].kickoffUtc, beforeGroups: !!groupStart && lastKickoff < groupStart,
+      ties: [...ties.values()].map(tieOf) };
   }).sort((a, b) => a.firstKickoff.localeCompare(b.firstKickoff));
 
   const thirdPlace = built.find((r) => THIRD_PLACE.test(r.name)) ?? null;
-  const qualifying = built.filter((r) => QUALIFYING.test(r.name));
-  const side = built.filter((r) => SIDE_ROUND.test(r.name));
-  const main = built.filter((r) => !THIRD_PLACE.test(r.name) && !QUALIFYING.test(r.name) && !SIDE_ROUND.test(r.name));
+  const isQualifying = (r) => QUALIFYING.test(r.name) || r.beforeGroups;
+  const qualifying = built.filter(isQualifying);
+  const side = built.filter((r) => SIDE_ROUND.test(r.name) && !isQualifying(r));
+  const main = built.filter((r) => !THIRD_PLACE.test(r.name) && !isQualifying(r) && !SIDE_ROUND.test(r.name));
 
   /* Arrange from the final backwards: the ties whose teams play in a later
    * tie go together, in that tie's order. */
@@ -146,6 +152,15 @@ export function bracket(db, competitionId, seasonId = null) {
       }
     }
     main[i].ties = [...ordered, ...pool.sort((a, b) => a.firstKickoff.localeCompare(b.firstKickoff))];
+  }
+
+  /* For the lines: which tie in the next round each tie leads to. */
+  for (let i = 0; i < main.length - 1; i += 1) {
+    main[i].ties.forEach((t) => {
+      const ids = new Set(t.teams.filter((x) => x.winner || !t.decided).map((x) => x.id));
+      const j = main[i + 1].ties.findIndex((n) => n.teams.some((x) => ids.has(x.id)));
+      t.next = j >= 0 ? j : null;
+    });
   }
 
   /* Rounds still to come: halve until the final, each slot waiting for

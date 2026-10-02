@@ -356,6 +356,9 @@ describe('Brackets', () => {
         VALUES (?, ?, ?, ?, ?, 'finished', ?, ?, ?, ?, 'api-football', ?, ?)`)
       .run(season, round, `2026-0${day}T20:00:00.000Z`, T[h], T[a], hg, ag, pens[0], pens[1], `ko${n += 1}`, now());
     add('League Stage - 1', '1-10', 0, 1, 1, 0);
+    db.prepare(`INSERT INTO matches (season_id, round, kickoff_utc, home_team_id, away_team_id, status_key, home_goals, away_goals,
+                source_key, source_ref, fetched_at) VALUES (?, 'Play-offs', '2025-08-20T19:00:00.000Z', ?, ?, 'finished', 1, 0, 'api-football', 'kq1', ?)`)
+      .run(season, T[8], T[9], now());
     /* Quarter-finals, two legs: 0 beat 7, 3 beat 4, 2 beat 5 (pens), 1 beat 6. */
     add('Quarter-finals', '3-01', 7, 0, 1, 1); add('Quarter-finals', '3-08', 0, 7, 2, 0);
     add('Quarter-finals', '3-01', 3, 4, 2, 0); add('Quarter-finals', '3-08', 4, 3, 1, 1);
@@ -370,6 +373,8 @@ describe('Brackets', () => {
     assert.ok(bracketCompetitions(db).some((c) => c.id === comp));
     const b = bracket(db, comp);
     assert.deepEqual(b.rounds.map((r) => r.name), ['Quarter-finals', 'Semi-finals', 'Final']);
+    assert.deepEqual(b.qualifying.map((r) => r.name), ['Play-offs'], 'a knockout round before the league phase is qualifying');
+    assert.deepEqual(b.rounds[0].ties.map((t) => t.next), [0, 0, 1, 1], 'each quarter-final leads to its semi-final');
     assert.equal(b.thirdPlace.ties.length, 1);
     const final = b.rounds[2].ties[0];
     assert.equal(final.teams.find((t) => t.winner).id, T[0], 'won on penalties');

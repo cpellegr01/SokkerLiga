@@ -621,3 +621,11 @@ input.auto { color: var(--muted); }
 .bracket-pair.joins > .bracket-slot::after, .bracket-pair.joins-one > .bracket-slot::after,
 .bracket-slot.fed::before { border-top-width: 0.5px; }
 .bracket-pair.joins::after { border-right-width: 0.5px; }
+/* Who went through: a tinted row and a tick; who went out, faded. */
+.bracket-team { border-radius: 4px; padding: 0.15rem 0.3rem; margin: 0 -0.3rem; }
+.bracket-team.winner { background: var(--accent-soft); }
+.bracket-team.out { opacity: 0.45; }
+.bracket-through { color: var(--accent); }
+.bracket-slot.out-line::after { content: ''; position: absolute; right: -1rem; top: 50%; width: 1rem;
+  border-top: 0.5px solid color-mix(in srgb, var(--muted) 45%, var(--border)); }
+.bracket-slot.fed::before { width: 1rem; }
