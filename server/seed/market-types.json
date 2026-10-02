@@ -1,5 +1,5 @@
 [
-  { "key": "match_result",      "name": "Match result (1X2)",    "family": "goals",   "has_line": 0, "ordinal": 1,  "description": "Home win, draw or away win after regular time." },
+  { "key": "match_result",      "name": "Moneyline (with Draw)", "family": "goals",   "has_line": 0, "ordinal": 1,  "description": "Home win, draw or away win after regular time." },
   { "key": "double_chance",     "name": "Double chance",         "family": "goals",   "has_line": 0, "ordinal": 2,  "description": "Two of the three results: home or draw, home or away, draw or away." },
   { "key": "draw_no_bet",       "name": "Draw no bet",           "family": "goals",   "has_line": 0, "ordinal": 3,  "description": "Home or away; a draw returns the stake." },
   { "key": "over_under",        "name": "Over/Under goals",      "family": "goals",   "has_line": 1, "ordinal": 4,  "description": "Total goals over or under the line." },

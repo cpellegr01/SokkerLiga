@@ -42,7 +42,7 @@ export const STANCE_LABEL = { support: 'Supports', caution: 'Cautious', oppose: 
 
 /* For the bet slip: every market, whether it has a line, and its choices. */
 export const MARKET_OPTIONS = [
-  { key: 'match_result', name: 'Match result (1X2)', line: false, selections: ['home', 'draw', 'away'] },
+  { key: 'match_result', name: 'Moneyline (with Draw)', line: false, selections: ['home', 'draw', 'away'] },
   { key: 'double_chance', name: 'Double chance', line: false, selections: ['home_draw', 'home_away', 'draw_away'] },
   { key: 'draw_no_bet', name: 'Draw no bet', line: false, selections: ['home', 'away'] },
   { key: 'over_under', name: 'Over/Under goals', line: true, defaultLine: 2.5, selections: ['over', 'under'] },

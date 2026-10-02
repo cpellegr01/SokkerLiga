@@ -126,7 +126,7 @@ describe('Backtest, performance and calibration on a simulated season', () => {
     assert.ok(perf.total.brier < perf.total.naiveBrier, 'beats always-guessing-the-hit-rate');
     assert.ok(perf.total.reliability.length >= 5);
     const mr = perf.byMarket.find((m) => m.key === 'match_result');
-    assert.ok(mr && mr.n > 100 && mr.label === 'Match result (1X2)');
+    assert.ok(mr && mr.n > 100 && mr.label === 'Moneyline (with Draw)');
     assert.ok(perf.byConfidence.length >= 1 && perf.byMonth.length >= 2);
     assert.equal(perf.backtest.matches, perf.backtest.priced);
     const ou = performance(db, { market: 'over_under', line: 2.5, selection: 'over' });
