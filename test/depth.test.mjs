@@ -342,3 +342,43 @@ describe('League catalogue', () => {
     assert.equal(enableFromCatalog(db, 999), id, 'switching on twice reuses the row');
   });
 });
+
+describe('Brackets', () => {
+  test('knockout ties: aggregates, penalties, and pairs that feed the same tie side by side', async () => {
+    const { bracket, bracketCompetitions } = await import('../server/brackets.mjs');
+    const comp = db.prepare("SELECT id FROM competitions WHERE key = 'champions-league'").get().id;
+    const season = Number(db.prepare(`INSERT INTO seasons (competition_id, year, label, start_date, end_date, is_current)
+                                      VALUES (?, 2025, '2025/26', '2025-07-01', '2026-06-01', 1)`).run(comp).lastInsertRowid);
+    const T = league.teamIds;
+    let n = 0;
+    const add = (round, day, h, a, hg, ag, pens = [null, null]) => db.prepare(`INSERT INTO matches (season_id, round, kickoff_utc,
+        home_team_id, away_team_id, status_key, home_goals, away_goals, home_pens, away_pens, source_key, source_ref, fetched_at)
+        VALUES (?, ?, ?, ?, ?, 'finished', ?, ?, ?, ?, 'api-football', ?, ?)`)
+      .run(season, round, `2026-0${day}T20:00:00.000Z`, T[h], T[a], hg, ag, pens[0], pens[1], `ko${n += 1}`, now());
+    add('League Stage - 1', '1-10', 0, 1, 1, 0);
+    /* Quarter-finals, two legs: 0 beat 7, 3 beat 4, 2 beat 5 (pens), 1 beat 6. */
+    add('Quarter-finals', '3-01', 7, 0, 1, 1); add('Quarter-finals', '3-08', 0, 7, 2, 0);
+    add('Quarter-finals', '3-01', 3, 4, 2, 0); add('Quarter-finals', '3-08', 4, 3, 1, 1);
+    add('Quarter-finals', '3-02', 2, 5, 1, 0); add('Quarter-finals', '3-09', 5, 2, 1, 0, [3, 4]);
+    add('Quarter-finals', '3-02', 6, 1, 0, 0); add('Quarter-finals', '3-09', 1, 6, 1, 0);
+    /* Semis: 0 v 2 and 3 v 1 (drawn in the other order to the quarters). */
+    add('Semi-finals', '4-01', 0, 2, 1, 0); add('Semi-finals', '4-08', 2, 0, 0, 0);
+    add('Semi-finals', '4-02', 3, 1, 0, 2); add('Semi-finals', '4-09', 1, 3, 0, 0);
+    add('3rd Place Final', '5-20', 2, 3, 1, 0);
+    add('Final', '5-30', 0, 1, 1, 1, [5, 4]);
+
+    assert.ok(bracketCompetitions(db).some((c) => c.id === comp));
+    const b = bracket(db, comp);
+    assert.deepEqual(b.rounds.map((r) => r.name), ['Quarter-finals', 'Semi-finals', 'Final']);
+    assert.equal(b.thirdPlace.ties.length, 1);
+    const final = b.rounds[2].ties[0];
+    assert.equal(final.teams.find((t) => t.winner).id, T[0], 'won on penalties');
+    const qf = b.rounds[0].ties;
+    const winnersInOrder = qf.map((t) => t.teams.find((x) => x.winner).id);
+    /* Semi 1 is 0 v 2, semi 2 is 3 v 1: the quarters line up the same way. */
+    assert.deepEqual(winnersInOrder, [T[0], T[2], T[3], T[1]]);
+    const t25 = qf.find((t) => t.teams.some((x) => x.id === T[5]));
+    assert.deepEqual(t25.teams.map((x) => x.goals), [1, 1]);
+    assert.equal(t25.kind, 'two-legs');
+  });
+});

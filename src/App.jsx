@@ -16,6 +16,7 @@ import History from './pages/History.jsx';
 import Performance from './pages/Performance.jsx';
 import Bankroll from './pages/Bankroll.jsx';
 import Ask from './pages/Ask.jsx';
+import Brackets from './pages/Brackets.jsx';
 import { BetSlipProvider } from './components/BetSlip.jsx';
 import { Teams, Players, Leagues } from './pages/Lists.jsx';
 
@@ -23,7 +24,7 @@ const NAV = [
   ['dashboard', 'Dashboard'], ['matches', 'Matches'], ['predictions', 'Predictions'], ['bets', 'My Bets'],
   ['history', 'Betting History'], ['bankroll', 'Bankroll'], ['performance', 'Model Performance'], ['ask', 'Ask'],
   ['teams', 'Teams'], ['players', 'Players'],
-  ['leagues', 'Leagues'], ['settings', 'Settings'],
+  ['leagues', 'Leagues'], ['brackets', 'Brackets'], ['settings', 'Settings'],
 ];
 /* Which nav item a detail page belongs to. */
 const SECTION = { match: 'matches', team: 'teams', player: 'players', league: 'leagues' };
@@ -102,6 +103,7 @@ function Routed({ page, props }) {
     case 'performance': return <Performance {...props} />;
     case 'bankroll': return <Bankroll {...props} />;
     case 'ask': return <Ask {...props} />;
+    case 'brackets': return <Brackets key={props.id ?? 'pick'} {...props} />;
     default: return <Dashboard {...props} />;
   }
 }

@@ -24,6 +24,7 @@ import {
   setClosingOdds, useCalculatedResult,
 } from './bets.mjs';
 import { performance } from './performance.mjs';
+import { bracket, bracketCompetitions } from './brackets.mjs';
 import { bankroll, saveBankrollSettings, addLedgerEntry } from './bankroll.mjs';
 import { ask } from './ask.mjs';
 import { defaultQuestionParser } from './ai/questions.mjs';
@@ -201,6 +202,9 @@ async function handleApi(req, res, url) {
 
   if (path === '/api/competitions' && method === 'GET') return send(res, 200, listCompetitions(db));
   if (path === '/api/league-catalog' && method === 'GET') return send(res, 200, leagueCatalog(db));
+  if (path === '/api/brackets' && method === 'GET') return send(res, 200, bracketCompetitions(db));
+  m = path.match(/^\/api\/competitions\/(\d+)\/bracket$/);
+  if (m && method === 'GET') return send(res, 200, bracket(db, m[1], q.season));
   if (path === '/api/competitions' && method === 'POST') {
     const body = await readJson(req);
     enableFromCatalog(db, body.apiFootballId);

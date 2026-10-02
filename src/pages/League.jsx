@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import * as api from '../api.js';
+import { href } from '../router.js';
 import { shortDate } from '../format.js';
 import { useApi, Page, Loading, ErrorBanner, Crest, StandingsTable, MatchRow, FavouriteStar } from '../components/ui.jsx';
 
@@ -24,6 +25,7 @@ export default function League({ id, me, onFavourite }) {
             </select>
           )}
         </div>
+        <a className="link-button" href={href('brackets', competition.id, data.season ? { season: data.season.id } : undefined)}>Bracket</a>
         <FavouriteStar on={fav} label={competition.name} onToggle={() => onFavourite('competition', competition.id, !fav)} />
       </div>
 
