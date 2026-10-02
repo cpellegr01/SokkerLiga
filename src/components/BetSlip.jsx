@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import * as api from '../api.js';
 import { go } from '../router.js';
-import { parseOdds, describeOdds, parseMoney, formatMoney, oddsHint, parseContractPrice } from '../odds.js';
+import { parseOdds, describeOdds, parseMoney, formatMoney, oddsHint, parseContractPrice, currencyLabel } from '../odds.js';
 import { MARKET_OPTIONS, selectionLabel } from '../markets.js';
 import { kickoff } from '../format.js';
 import { ErrorBanner } from './ui.jsx';
@@ -229,7 +229,7 @@ function SlipDrawer() {
               {contractMode && (
                 <>
                   <div className="slip-row">
-                    <label className="slip-field">Bet ({currency})
+                    <label className="slip-field">Bet ({currencyLabel(currency)})
                       <input value={draft.orderAmount ?? ''} inputMode="decimal" placeholder="10.00" onChange={(e) => set({ orderAmount: e.target.value })} />
                       <span className="subtle">The amount you placed the order for.</span>
                     </label>
@@ -243,11 +243,11 @@ function SlipDrawer() {
                     </label>
                   </div>
                   <div className="slip-row">
-                    <label className="slip-field">Filled notional ({currency})
+                    <label className="slip-field">Filled notional ({currencyLabel(currency)})
                       <input value={draft.stake} inputMode="decimal" placeholder="9.52" onChange={(e) => set({ stake: e.target.value, stakeAuto: false })} />
                       <span className="subtle">What the contracts cost. Filled in from the limit; change it if the order filled lower.</span>
                     </label>
-                    <label className="slip-field">Commissions and fees
+                    <label className="slip-field">Commissions and fees ({currencyLabel(currency)})
                       <input value={draft.fee} inputMode="decimal" placeholder="0.00" onChange={(e) => set({ fee: e.target.value })} />
                       <span className="subtle">Both together, as one amount.</span>
                     </label>
@@ -257,7 +257,7 @@ function SlipDrawer() {
                 </>
               )}
               {!contractMode && <div className="slip-row">
-                <label className="slip-field">Bet ({currency})
+                <label className="slip-field">Bet ({currencyLabel(currency)})
                   <input value={draft.stake} inputMode="decimal" placeholder="10.00" onChange={(e) => set({ stake: e.target.value, stakeAuto: false })} />
                   <span className="subtle">The amount you put on the bet — what you lose if it loses.</span>
                   {payout && (
@@ -281,7 +281,7 @@ function SlipDrawer() {
                     </span>
                   )}
                 </label>
-                <label className="slip-field">Fees ({currency}, optional)
+                <label className="slip-field">Fees ({currencyLabel(currency)}, optional)
                   <input value={draft.fee} inputMode="decimal" placeholder="0.00" onChange={(e) => set({ fee: e.target.value })} />
                   <span className="subtle">Any fee the app charged on top of the bet. It is counted as spent whatever the result.</span>
                 </label>

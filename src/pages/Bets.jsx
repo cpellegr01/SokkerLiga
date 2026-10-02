@@ -2,7 +2,7 @@ import { useState } from 'react';
 import * as api from '../api.js';
 import { href } from '../router.js';
 import { kickoff, longDate } from '../format.js';
-import { formatMoney } from '../odds.js';
+import { formatMoney, currencyLabel } from '../odds.js';
 import { OUTCOME_LABEL } from '../markets.js';
 import { useApi, Page, Loading, ErrorBanner, Empty, Tabs, OutcomeBadge, Profit, DecisionBadge } from '../components/ui.jsx';
 import { useSlip } from '../components/BetSlip.jsx';
@@ -157,7 +157,7 @@ function CorrectForm({ bet, onDone }) {
             {Object.entries(OUTCOME_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
           </select>
         </label>
-        <label className="slip-field">Profit or loss ({bet.currency}, optional)
+        <label className="slip-field">Profit or loss ({currencyLabel(bet.currency)}, optional)
           <input value={profit} inputMode="decimal" placeholder="Worked out if empty" onChange={(e) => setProfit(e.target.value)} />
         </label>
       </div>

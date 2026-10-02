@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import * as api from '../api.js';
-import { formatMoney } from '../odds.js';
+import { formatMoney, currencyLabel } from '../odds.js';
 import { shortDate } from '../format.js';
 import DatePicker from '../components/DatePicker.jsx';
 import { useApi, Page, Loading, ErrorBanner, Empty, Profit } from '../components/ui.jsx';
@@ -120,7 +120,7 @@ function SettingsForm({ currency, current, onDone, onCancel }) {
         <label className="slip-field">Currency
           <input value={form.currency} maxLength={3} disabled={!!current} onChange={(e) => set({ currency: e.target.value.toUpperCase() })} />
         </label>
-        <label className="slip-field">Starting amount
+        <label className="slip-field">Starting amount ({currencyLabel(form.currency || 'USD')})
           <input value={form.starting} inputMode="decimal" placeholder="1000.00" onChange={(e) => set({ starting: e.target.value })} />
         </label>
         <div className="slip-field">Counting bets from
@@ -134,7 +134,7 @@ function SettingsForm({ currency, current, onDone, onCancel }) {
           </select>
           <span className="subtle">{METHOD[form.method][1]}</span>
         </label>
-        <label className="slip-field">{form.method === 'percent' ? 'Percent of balance' : form.method === 'flat' ? 'Bet amount' : 'Unit size'}
+        <label className="slip-field">{form.method === 'percent' ? 'Percent of balance' : form.method === 'flat' ? `Bet amount (${currencyLabel(form.currency || 'USD')})` : `Unit size (${currencyLabel(form.currency || 'USD')})`}
           <input value={form.amount} inputMode="decimal" placeholder={form.method === 'percent' ? '2' : '10.00'} onChange={(e) => set({ amount: e.target.value })} />
         </label>
         <label className="slip-field">Limit on open bets (% of balance)
@@ -170,7 +170,7 @@ function LedgerForm({ currency, onDone }) {
             <option value="deposit">Deposit</option><option value="withdrawal">Withdrawal</option>
           </select>
         </label>
-        <label className="slip-field">Amount ({currency})
+        <label className="slip-field">Amount ({currencyLabel(currency)})
           <input value={form.amount} inputMode="decimal" onChange={(e) => setForm({ ...form, amount: e.target.value })} />
         </label>
         <div className="slip-field">Date

@@ -115,3 +115,14 @@ export function parseContractPrice(input) {
   const p = v < 1 ? v : v / 100;
   return p > 0 && p < 1 ? Math.round(p * 10000) / 10000 : null;
 }
+
+/** "$ USD", for labels on money fields. */
+export function currencyLabel(currency = 'USD') {
+  try {
+    const sym = new Intl.NumberFormat(undefined, { style: 'currency', currency, currencyDisplay: 'narrowSymbol' })
+      .formatToParts(0).find((p) => p.type === 'currency')?.value;
+    return sym && sym !== currency ? `${sym} ${currency}` : currency;
+  } catch {
+    return currency;
+  }
+}
