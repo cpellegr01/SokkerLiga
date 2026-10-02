@@ -28,7 +28,7 @@ npm run build
 if [ -n "$(git status --porcelain)" ]; then
   echo "==> Committing"
   git add -A
-  git commit -q -m "SokkerLiga v$VERSION — $MESSAGE"
+  git commit -q -m "SokkerLiga v$VERSION — $MESSAGE" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 fi
 
 if git remote get-url origin >/dev/null 2>&1; then
