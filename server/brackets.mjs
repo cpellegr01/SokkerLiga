@@ -89,7 +89,10 @@ export function bracket(db, competitionId, seasonId = null) {
   if (!seasonId && season && !hasKnockouts(season)) {
     const earlier = seasons.find(hasKnockouts);
     if (earlier) {
-      note = `${season.label} is still in its group or league phase; its knockout rounds have not been scheduled yet. Showing ${earlier.label}.`;
+      const lastGroup = db.prepare(`SELECT MAX(kickoff_utc) AS k FROM matches WHERE season_id = ?`).get(season.id).k;
+      note = {
+        season: season.label, groupPhaseEnds: lastGroup, seasonEnds: season.end_date ?? null, showing: earlier.label,
+      };
       season = earlier;
     }
   }
@@ -169,6 +172,8 @@ export function bracket(db, competitionId, seasonId = null) {
     competition,
     season: { id: season.id, label: season.label },
     note,
+    /* When the knockouts begin: the first knockout match on record. */
+    startsAt: main[0]?.firstKickoff ?? null,
     rounds: [...main.map(({ name, ties }) => ({ name, ties })), ...projected],
     sideRounds: side.map(({ name, ties }) => ({ name, ties })),
     thirdPlace: thirdPlace ? { name: thirdPlace.name, ties: thirdPlace.ties } : null,

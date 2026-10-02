@@ -412,7 +412,8 @@ describe('Brackets', () => {
     nm(cur, 'League A - 1', 0, 1, 1, 1, '2026-09-24T18:45:00.000Z');
     const nb = bracket(db, nl);
     assert.equal(nb.season.label, '2024/25');
-    assert.match(nb.note, /2026 is still in its group or league phase/);
+    assert.deepEqual([nb.note.season, nb.note.showing, nb.note.groupPhaseEnds], ['2026', '2024/25', '2026-09-24T18:45:00.000Z']);
+    assert.equal(nb.startsAt, '2025-06-04T19:00:00.000Z');
     assert.deepEqual(nb.rounds.map((r) => r.name), ['Semi-finals', 'Final']);
     assert.deepEqual(nb.sideRounds.map((r) => r.name), ['Play-offs A/B']);
   });

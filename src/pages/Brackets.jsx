@@ -2,6 +2,9 @@ import { useState } from 'react';
 import * as api from '../api.js';
 import { href, go } from '../router.js';
 import { kickoff } from '../format.js';
+
+const longDay = (iso) => new Date(iso.length === 10 ? `${iso}T12:00:00` : iso)
+  .toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' });
 import { useApi, Page, Loading, ErrorBanner, Empty, Crest } from '../components/ui.jsx';
 
 /** Knockout brackets: pick a competition, see its rounds side by side. */
@@ -37,10 +40,23 @@ export default function Brackets({ id, params }) {
       {data && (
         !data.rounds.length && !data.qualifying.length && !data.sideRounds.length ? <Empty>{data.competition?.name ?? 'This competition'} has no knockout rounds in {data.season?.label ?? 'this season'}.</Empty> : (
           <>
-            {data.note && <div className="banner warn">{data.note}</div>}
+            {data.note && (
+              <div className="banner warn">
+                {data.note.season} is still in its group or league phase
+                {data.note.groupPhaseEnds ? <>, which ends on <span className="nowrap">{longDay(data.note.groupPhaseEnds)}</span></> : ''}.
+                {' '}Its knockout dates have not been published yet
+                {data.note.seasonEnds ? <> (the season runs until <span className="nowrap">{longDay(data.note.seasonEnds)}</span>)</> : ''}; they
+                appear here as soon as they are. Showing {data.note.showing} meanwhile.
+              </div>
+            )}
             <div className="bracket-head">
               <Crest src={data.competition.logo} name={data.competition.name} size={28} />
               <h2>{data.competition.name} <span className="subtle">{data.season.label}</span></h2>
+              {data.startsAt && (
+                <span className="subtle">
+                  {Date.parse(data.startsAt) > Date.now() ? 'Knockouts start' : 'Knockouts started'} <span className="nowrap">{longDay(data.startsAt)}</span>
+                </span>
+              )}
             </div>
             <div className="bracket" role="region" aria-label={`${data.competition.name} bracket`}>
               {[...(qualifying ? data.qualifying : []), ...data.rounds].map((r, i, all) => (

@@ -589,3 +589,4 @@ input.auto { color: var(--muted); }
 @media (max-width: 720px) { .bracket-round { min-width: 190px; flex-basis: 190px; } }
 .bracket-tie.projected { border-style: dashed; background: transparent; }
 .bracket-legs { white-space: normal; overflow: visible; }
+.nowrap { white-space: nowrap; }
