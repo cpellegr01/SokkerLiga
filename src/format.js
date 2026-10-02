@@ -15,7 +15,10 @@ export function kickoffDay(iso) {
   if (sameDay(d, today)) return 'Today';
   if (sameDay(d, tomorrow)) return 'Tomorrow';
   if (sameDay(d, yesterday)) return 'Yesterday';
-  return d.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
+  /* The year whenever it is not this one: head-to-head and old results
+   * go back seasons, and "Sun, Nov 17" alone does not say which. */
+  return d.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short',
+    ...(d.getFullYear() !== today.getFullYear() ? { year: 'numeric' } : {}) });
 }
 
 export const kickoff = (iso) => `${kickoffDay(iso)} · ${kickoffTime(iso)}`;
