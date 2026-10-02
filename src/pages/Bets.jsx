@@ -59,6 +59,11 @@ function BetCard({ bet, onChanged }) {
             : <span>Profit <Profit minor={bet.profitMinor} currency={bet.currency} format={formatMoney} /></span>}
           <OutcomeBadge outcome={bet.outcome} />
           {bet.settledBy === 'manual' && <span className="subtle">Corrected by hand</span>}
+          {bet.settledBy === 'manual' && (
+            <button className="link-button" onClick={async () => {
+              try { await api.useCalculatedResult(bet.id); onChanged(); } catch (e) { setError(e.message); }
+            }}>Use the calculated result</button>
+          )}
         </div>
       </div>
 

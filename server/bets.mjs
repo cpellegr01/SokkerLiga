@@ -218,8 +218,19 @@ export function updateBet(db, userId, id, input) {
         bet.potentialPayoutMinor, bet.notes, at, existing.id);
     writeLegs(db, existing.id, bet);
   });
-  settleBets(db, { betIds: [existing.id], reconsider: true });
+  /* The bet now says exactly what was placed, so its result is worked out
+   * again — a hand correction made before the edit no longer stands. */
+  settleBets(db, { betIds: [existing.id], reconsider: true, override: true });
   return getBet(db, existing.id, userId);
+}
+
+/** Drop a hand correction: the calculated result takes over again (a new
+ *  settlement row; the correction stays in the history). */
+export function useCalculatedResult(db, userId, id) {
+  const bet = db.prepare('SELECT id FROM bets WHERE id = ? AND user_id = ? AND deleted_at IS NULL').get(Number(id), userId);
+  if (!bet) throw new ValidationError('That bet does not exist.', 404);
+  settleBets(db, { betIds: [bet.id], reconsider: true, override: true });
+  return getBet(db, bet.id, userId);
 }
 
 export function deleteBet(db, userId, id, reason = 'Deleted') {
@@ -265,7 +276,7 @@ const currentRow = (db, betId, legId) => db.prepare(`
  * outcome changes; a bet whose latest row is a manual correction is left
  * alone. Returns the number of rows written.
  */
-export function settleBets(db, { betIds = null, matchIds = null, reconsider = false, now = Date.now() } = {}) {
+export function settleBets(db, { betIds = null, matchIds = null, reconsider = false, override = false, now = Date.now() } = {}) {
   let bets;
   if (betIds) {
     bets = db.prepare(`SELECT * FROM bets WHERE deleted_at IS NULL AND id IN (${betIds.map(() => '?').join(',')})`).all(...betIds);
@@ -279,7 +290,7 @@ export function settleBets(db, { betIds = null, matchIds = null, reconsider = fa
   const at = new Date(now).toISOString();
   for (const bet of bets) {
     const head = currentRow(db, bet.id, null);
-    if (head?.source === 'manual' && !reconsider) continue;
+    if (head?.source === 'manual' && !reconsider && !override) continue;
     const legs = db.prepare(`SELECT l.*, mk.market_type_key AS market, mk.line, s.key AS selection
                              FROM bet_legs l JOIN selections s ON s.id = l.selection_id JOIN markets mk ON mk.id = s.market_id
                              WHERE l.bet_id = ? AND l.replaced_at IS NULL ORDER BY l.ordinal`).all(bet.id);
@@ -296,11 +307,12 @@ export function settleBets(db, { betIds = null, matchIds = null, reconsider = fa
           written += 1;
         }
       }
-      if (head?.source === 'manual' && reconsider) return;
+      if (head?.source === 'manual' && reconsider && !override) return;
       const result = settleBet({ stakeMinor: bet.stake_minor, totalOdds: bet.total_odds, legs: graded });
       /* Fees are never returned, whatever the result. */
       if (result.profitMinor !== null) result.profitMinor -= (bet.fee_minor ?? 0) + (bet.commission_minor ?? 0);
-      if (head?.outcome !== result.outcome || (head?.profit_minor ?? null) !== result.profitMinor) {
+      if (head?.outcome !== result.outcome || (head?.profit_minor ?? null) !== result.profitMinor
+          || (override && head?.source === 'manual')) {
         if (!(head === undefined && result.outcome === 'pending')) {
           db.prepare(`INSERT INTO settlements (bet_id, bet_leg_id, outcome, source, reason, profit_minor, settled_at)
                       VALUES (?, NULL, ?, 'auto', NULL, ?, ?)`).run(bet.id, result.outcome, result.profitMinor, at);

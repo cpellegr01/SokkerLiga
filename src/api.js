@@ -68,3 +68,4 @@ export const setClosingOdds = (betId, legId, closingOdds) =>
   request(`/bets/${betId}/legs/${legId}/closing`, { method: 'PUT', body: JSON.stringify({ closingOdds }) });
 export const ask = (question) => request('/ask', { method: 'POST', body: JSON.stringify({ question }) });
 export const matchPlayers = (id) => request(`/matches/${id}/players`);
+export const useCalculatedResult = (id) => request(`/bets/${id}/calculated`, { method: 'POST' });

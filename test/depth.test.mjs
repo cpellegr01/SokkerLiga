@@ -299,3 +299,24 @@ describe('Commissions', () => {
     assert.equal(bet.profitMinor, 1400 - 980);
   });
 });
+
+describe('Hand corrections and the calculated result', () => {
+  test('editing a bet, or asking for it, replaces a hand correction with the calculation', async () => {
+    const { updateBet, useCalculatedResult, correctSettlement } = await import('../server/bets.mjs');
+    saveSportsbook(db, { name: 'Robinhood', currency: 'USD' });
+    const past = league.matchIds[63];
+    const m = db.prepare('SELECT kickoff_utc, home_goals, away_goals FROM matches WHERE id = ?').get(past);
+    const won = m.home_goals > m.away_goals ? 'home' : m.home_goals < m.away_goals ? 'away' : 'draw';
+    const body = { sportsbook: 'robinhood', stake: '9.52', fee: '0.28', contracts: '14', limitPrice: '0.68',
+      placedAt: new Date(Date.parse(m.kickoff_utc) - 3600_000).toISOString(),
+      legs: [{ matchId: past, market: 'match_result', selection: won, odds: '' }] };
+    const bet = createBet(db, 'u1', body);
+    correctSettlement(db, 'u1', bet.id, { outcome: 'won', profit: '4.48', reason: 'As the app said' });
+    assert.equal(getBet(db, bet.id, 'u1').profitMinor, 448);
+    const back = useCalculatedResult(db, 'u1', bet.id);
+    assert.deepEqual([back.profitMinor, back.settledBy], [420, 'auto']);
+    correctSettlement(db, 'u1', bet.id, { outcome: 'won', profit: '5', reason: 'x' });
+    const edited = updateBet(db, 'u1', bet.id, body);
+    assert.deepEqual([edited.profitMinor, edited.settledBy], [420, 'auto']);
+  });
+});

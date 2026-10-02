@@ -20,7 +20,7 @@ import {
 import { syncStatus, requestRun } from './jobs.mjs';
 import {
   listSportsbooks, saveSportsbook, createBet, updateBet, deleteBet, correctSettlement, listBets, getBet, bettingHistory,
-  setClosingOdds,
+  setClosingOdds, useCalculatedResult,
 } from './bets.mjs';
 import { performance } from './performance.mjs';
 import { bankroll, saveBankrollSettings, addLedgerEntry } from './bankroll.mjs';
@@ -156,6 +156,8 @@ async function handleApi(req, res, url) {
   }
   m = path.match(/^\/api\/bets\/(\d+)\/settlements$/);
   if (m && method === 'POST') return send(res, 200, correctSettlement(db, person.id, m[1], await readJson(req)));
+  m = path.match(/^\/api\/bets\/(\d+)\/calculated$/);
+  if (m && method === 'POST') return send(res, 200, useCalculatedResult(db, person.id, m[1]));
   m = path.match(/^\/api\/bets\/(\d+)\/legs\/(\d+)\/closing$/);
   if (m && method === 'PUT') {
     const body = await readJson(req);
