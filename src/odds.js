@@ -95,10 +95,12 @@ export function parseMoney(input) {
   return Number.isFinite(v) && v > 0 ? Math.round(v * 100) : null;
 }
 
+/* Always the symbol and the code: "$10.00 USD", "€5.00 EUR". */
 export function formatMoney(minor, currency = 'USD') {
   if (minor === null || minor === undefined) return '—';
   try {
-    return new Intl.NumberFormat(undefined, { style: 'currency', currency }).format(minor / 100);
+    const n = new Intl.NumberFormat(undefined, { style: 'currency', currency, currencyDisplay: 'narrowSymbol' }).format(minor / 100);
+    return `${n} ${currency}`;
   } catch {
     return `${(minor / 100).toFixed(2)} ${currency}`;
   }

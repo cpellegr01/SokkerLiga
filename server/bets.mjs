@@ -109,6 +109,10 @@ function normaliseBet(db, input) {
     if (!(contracts > 0)) throw new ValidationError('Contracts must be a number above zero, such as 14.');
     if (contracts * 100 <= stakeMinor) throw new ValidationError('The contracts would pay back no more than the bet; check the bet and the contracts.');
   }
+  const orderAmountMinor = contracts && input.orderAmount ? parseMoney(input.orderAmount) : null;
+  if (contracts && input.orderAmount && String(input.orderAmount).trim() !== '' && !orderAmountMinor) {
+    throw new ValidationError('The bet amount must be an amount, such as 10.00.');
+  }
   const limitPrice = parseContractPrice(input.limitPrice);
   if (input.limitPrice && String(input.limitPrice).trim() !== '' && limitPrice === null) {
     throw new ValidationError('The limit price must be between 1¢ and 99¢, such as 68¢.');
@@ -147,7 +151,7 @@ function normaliseBet(db, input) {
   let totalOdds = Math.round((total?.decimal ?? product) * 10000) / 10000;
   if (contracts) totalOdds = filled.decimal;
   return {
-    book, stakeMinor, feeMinor, commissionMinor, contracts, limitPrice, placedAt: placedAt.toISOString(), kind, legs: out, totalOdds,
+    book, stakeMinor, feeMinor, commissionMinor, orderAmountMinor, contracts, limitPrice, placedAt: placedAt.toISOString(), kind, legs: out, totalOdds,
     totalOddsText: total?.text ?? null, notes: input.notes?.trim() || null,
     potentialPayoutMinor: contracts ? Math.round(contracts * 100) : Math.round(stakeMinor * totalOdds),
   };
@@ -176,10 +180,10 @@ export function createBet(db, userId, input) {
   const bet = normaliseBet(db, input);
   const id = transaction(db, () => {
     const at = nowIso();
-    const betId = Number(db.prepare(`INSERT INTO bets (user_id, placed_at, sportsbook_key, kind, stake_minor, fee_minor, commission_minor, contracts, limit_price,
+    const betId = Number(db.prepare(`INSERT INTO bets (user_id, placed_at, sportsbook_key, kind, stake_minor, fee_minor, commission_minor, order_amount_minor, contracts, limit_price,
         currency, total_odds, total_odds_text, potential_payout_minor, notes, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-      .run(userId, bet.placedAt, bet.book.key, bet.kind, bet.stakeMinor, bet.feeMinor, bet.commissionMinor, bet.contracts, bet.limitPrice, bet.book.currency, bet.totalOdds,
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      .run(userId, bet.placedAt, bet.book.key, bet.kind, bet.stakeMinor, bet.feeMinor, bet.commissionMinor, bet.orderAmountMinor, bet.contracts, bet.limitPrice, bet.book.currency, bet.totalOdds,
         bet.totalOddsText, bet.potentialPayoutMinor, bet.notes, at, at).lastInsertRowid);
     writeLegs(db, betId, bet);
     return betId;
@@ -208,9 +212,9 @@ export function updateBet(db, userId, id, input) {
     /* The old legs stay, marked replaced, so their settlement history keeps
      * pointing at real rows; the new legs are written alongside. */
     db.prepare('UPDATE bet_legs SET replaced_at = ? WHERE bet_id = ? AND replaced_at IS NULL').run(at, existing.id);
-    db.prepare(`UPDATE bets SET placed_at = ?, sportsbook_key = ?, kind = ?, stake_minor = ?, fee_minor = ?, commission_minor = ?, contracts = ?, limit_price = ?, currency = ?,
+    db.prepare(`UPDATE bets SET placed_at = ?, sportsbook_key = ?, kind = ?, stake_minor = ?, fee_minor = ?, commission_minor = ?, order_amount_minor = ?, contracts = ?, limit_price = ?, currency = ?,
                   total_odds = ?, total_odds_text = ?, potential_payout_minor = ?, notes = ?, updated_at = ? WHERE id = ?`)
-      .run(bet.placedAt, bet.book.key, bet.kind, bet.stakeMinor, bet.feeMinor, bet.commissionMinor, bet.contracts, bet.limitPrice, bet.book.currency, bet.totalOdds, bet.totalOddsText,
+      .run(bet.placedAt, bet.book.key, bet.kind, bet.stakeMinor, bet.feeMinor, bet.commissionMinor, bet.orderAmountMinor, bet.contracts, bet.limitPrice, bet.book.currency, bet.totalOdds, bet.totalOddsText,
         bet.potentialPayoutMinor, bet.notes, at, existing.id);
     writeLegs(db, existing.id, bet);
   });
@@ -358,7 +362,7 @@ function shapeBet(db, b) {
     WHERE l.bet_id = ? AND l.replaced_at IS NULL ORDER BY l.ordinal`).all(b.id);
   return {
     id: b.id, placedAt: b.placed_at, sportsbook: { key: b.sportsbook_key, name: b.sportsbook_name }, kind: b.kind,
-    stakeMinor: b.stake_minor, feeMinor: b.fee_minor ?? 0, commissionMinor: b.commission_minor ?? 0,
+    stakeMinor: b.stake_minor, feeMinor: b.fee_minor ?? 0, commissionMinor: b.commission_minor ?? 0, orderAmountMinor: b.order_amount_minor ?? null,
     totalCostMinor: b.stake_minor + (b.fee_minor ?? 0) + (b.commission_minor ?? 0), contracts: b.contracts ?? null, limitPrice: b.limit_price ?? null, currency: b.currency, totalOdds: b.total_odds, totalOddsText: b.total_odds_text,
     potentialPayoutMinor: b.potential_payout_minor, notes: b.notes, createdAt: b.created_at, updatedAt: b.updated_at,
     outcome: b.outcome ?? 'pending', profitMinor: b.profit_minor ?? null, settledBy: b.settled_by ?? null,

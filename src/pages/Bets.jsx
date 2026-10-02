@@ -44,6 +44,7 @@ function BetCard({ bet, onChanged }) {
         <div className="bet-figures">
           {bet.contracts ? (
             <>
+              {bet.orderAmountMinor && <span>Bet {formatMoney(bet.orderAmountMinor, bet.currency)}</span>}
               <span>{bet.contracts} contract{bet.contracts === 1 ? '' : 's'}{bet.limitPrice ? ` · limit ${Math.round(bet.limitPrice * 10000) / 100}¢` : ''}</span>
               <span>Filled notional {formatMoney(bet.stakeMinor, bet.currency)}</span>
             </>

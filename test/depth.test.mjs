@@ -9,6 +9,7 @@ import { quotaHold, quotaLeft, runJob } from '../server/jobs.mjs';
 import { runBacktest } from '../server/backtest.mjs';
 import { ask, resolveFilter } from '../server/ask.mjs';
 import { selectionLabel } from '../src/markets.js';
+import { formatMoney } from '../src/odds.js';
 import { seedLeague } from './fixtures/league.mjs';
 
 const DAY = 86400_000;
@@ -291,6 +292,10 @@ describe('Commissions', () => {
       placedAt: new Date(Date.parse(m.kickoff_utc) - 3600_000).toISOString(),
       legs: [{ matchId: past, market: 'match_result', selection: won, odds: '' }] });
     assert.equal(bet.totalCostMinor, 980);
+    const again = createBet(db, 'u1', { sportsbook: 'robinhood', stake: '9.52', fee: '0.28', orderAmount: '10.00', contracts: '14', limitPrice: '68',
+      legs: [{ matchId: league.upcomingId, market: 'btts', selection: 'yes', odds: '' }] });
+    assert.equal(again.orderAmountMinor, 1000);
+    assert.match(formatMoney(1000, 'USD'), /^\$10\.00 USD$/);
     assert.equal(bet.profitMinor, 1400 - 980);
   });
 });

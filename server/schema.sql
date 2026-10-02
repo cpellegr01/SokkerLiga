@@ -694,7 +694,8 @@ CREATE TABLE IF NOT EXISTS bets (
   fee_minor              INTEGER NOT NULL DEFAULT 0,   -- the app's fees, charged on top of the bet and never returned
   contracts              REAL,                          -- prediction-market apps: contracts bought, each paying 1.00 if it wins
   limit_price            REAL,
-  commission_minor       INTEGER NOT NULL DEFAULT 0,   -- the app's commission, like fees: on top of the bet, never returned                          -- the order's limit price per contract (0.68), kept as typed; the fill is bet ÷ contracts
+  commission_minor       INTEGER NOT NULL DEFAULT 0,
+  order_amount_minor     INTEGER,                      -- contract bets: the amount the order was placed for ($10.00); what was spent is the total cost   -- the app's commission, like fees: on top of the bet, never returned                          -- the order's limit price per contract (0.68), kept as typed; the fill is bet ÷ contracts
   notes                  TEXT,
   created_at             TEXT NOT NULL,
   updated_at             TEXT NOT NULL,

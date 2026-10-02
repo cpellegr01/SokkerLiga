@@ -75,6 +75,7 @@ const ADDED_COLUMNS = [
   ['bets', 'contracts', 'REAL'],
   ['bets', 'limit_price', 'REAL'],
   ['bets', 'commission_minor', 'INTEGER NOT NULL DEFAULT 0'],
+  ['bets', 'order_amount_minor', 'INTEGER'],
 ];
 
 function addMissingColumns(db) {
