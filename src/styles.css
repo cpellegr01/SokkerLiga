@@ -22,6 +22,14 @@
   --danger-bg: #fbeceb;
   --danger-fg: #a3302a;
   --radius: 10px;
+  /* The top bar stays dark in both themes: the logo is cream and lime,
+   * drawn for a dark background. */
+  --bar-bg: #121412;
+  --bar-fg: #e9ebe6;
+  --bar-muted: #9ba096;
+  --bar-border: #2a2e2a;
+  --bar-field: #1d211d;
+  --bar-h: 48px;
   /* The type scale — every font size on the site is one of these. All
    * 12px by choice (Claudio, 2026-10-02): hierarchy comes from weight and
    * colour, not size. Change a step here to change it everywhere. */
@@ -35,8 +43,6 @@
   --fs-section: 14px;
   /* Page titles: bigger again, and bold (Claudio, 2026-10-02). */
   --fs-page: 18px;
-  /* The SokkerLiga name in the top bar. */
-  --fs-brand: 20px;
   font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
   color: var(--fg);
   background: var(--bg);
@@ -106,11 +112,16 @@ input, select {
 .shell { min-height: 100vh; display: flex; flex-direction: column; }
 .topbar {
   position: sticky; top: 0; z-index: 20; display: flex; align-items: center; gap: 0.75rem;
-  padding: 0.6rem 16px; background: var(--surface); border-bottom: 1px solid var(--border);
+  height: var(--bar-h); padding: 0 16px; background: var(--bar-bg); color: var(--bar-fg); border-bottom: 1px solid var(--bar-border);
 }
-.brand { display: inline-flex; align-items: center; gap: 0.5rem; font-weight: 700; color: var(--fg);
-  font-size: var(--fs-brand); letter-spacing: -0.01em; white-space: nowrap; }
-.brand-icon { width: 28px; height: 28px; flex-shrink: 0; }
+.topbar .subtle, .topbar a.subtle { color: var(--bar-muted); }
+.topbar a.subtle:hover { color: var(--bar-fg); }
+.topbar .menu-button { color: var(--bar-fg); }
+.topbar .search input { background: var(--bar-field); border-color: var(--bar-border); color: var(--bar-fg); }
+.topbar .search input::placeholder { color: var(--bar-muted); }
+.brand { display: inline-flex; align-items: center; gap: 0.5rem; flex-shrink: 0; }
+.brand-icon { width: 32px; height: 32px; flex-shrink: 0; }
+.brand-wordmark { height: 22px; width: auto; display: block; }
 .brand:hover { text-decoration: none; }
 .topbar-right { margin-left: auto; display: flex; gap: 0.9rem; align-items: center; white-space: nowrap; }
 .menu-button { display: none; border: none; background: none; font-size: 18px; padding: 0.2rem 0.4rem; }
@@ -118,7 +129,7 @@ input, select {
 .sidenav {
   width: 210px; flex-shrink: 0; padding: 1rem 0.6rem; border-right: 1px solid var(--border);
   background: var(--surface); display: flex; flex-direction: column; gap: 2px;
-  position: sticky; top: 53px; height: calc(100vh - 53px); overflow-y: auto;
+  position: sticky; top: var(--bar-h); height: calc(100vh - var(--bar-h)); overflow-y: auto;
 }
 .sidenav a { padding: 0.45rem 0.7rem; border-radius: 6px; color: var(--fg); }
 .sidenav a:hover { background: var(--surface-2); text-decoration: none; }
@@ -311,13 +322,15 @@ table { border-collapse: collapse; width: 100%; }
 @media (max-width: 720px) {
   .menu-button { display: block; }
   .sidenav {
-    position: fixed; top: 53px; left: 0; bottom: 0; height: auto; z-index: 25; transform: translateX(-100%);
+    position: fixed; top: var(--bar-h); left: 0; bottom: 0; height: auto; z-index: 25; transform: translateX(-100%);
     transition: transform 0.15s; box-shadow: 0 0 24px rgba(0, 0, 0, 0.2);
   }
   .sidenav.open { transform: none; }
   .content { padding: 1rem 16px 3rem; }
   .hide-sm { display: none; }
   .topbar { gap: 0.5rem; }
+  .brand-wordmark { height: 18px; }
+  .brand-icon { width: 28px; height: 28px; }
   .match-row { grid-template-columns: 3.2rem minmax(0, 1fr) 3rem minmax(0, 1fr); padding: 0.55rem 0.6rem; gap: 0.4rem; }
   .match-row.with-day { grid-template-columns: minmax(0, 1fr) 3rem minmax(0, 1fr); }
   .match-row.with-day .match-meta { display: flex; }
