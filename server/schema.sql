@@ -691,6 +691,7 @@ CREATE TABLE IF NOT EXISTS bets (
   total_odds             REAL NOT NULL CHECK (total_odds > 1),
   total_odds_text        TEXT,                   -- as typed, when the app quoted its own total
   potential_payout_minor INTEGER NOT NULL,
+  fee_minor              INTEGER NOT NULL DEFAULT 0,   -- the app's fees, charged on top of the bet and never returned
   notes                  TEXT,
   created_at             TEXT NOT NULL,
   updated_at             TEXT NOT NULL,

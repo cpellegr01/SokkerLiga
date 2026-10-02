@@ -18,7 +18,7 @@ const STORE = 'sokkerliga.betslip';
 const load = () => {
   try { return JSON.parse(localStorage.getItem(STORE)) ?? null; } catch { return null; }
 };
-const emptyDraft = () => ({ editingId: null, legs: [], stake: '', sportsbook: '', placedAt: '', totalOdds: '', notes: '' });
+const emptyDraft = () => ({ editingId: null, legs: [], stake: '', fee: '', sportsbook: '', placedAt: '', totalOdds: '', notes: '' });
 
 export function BetSlipProvider({ children }) {
   const [draft, setDraft] = useState(() => load() ?? emptyDraft());
@@ -41,7 +41,8 @@ export function BetSlipProvider({ children }) {
     /** Load an existing bet to fix it. */
     edit(bet) {
       setDraft({
-        editingId: bet.id, stake: (bet.stakeMinor / 100).toFixed(2), sportsbook: bet.sportsbook.key,
+        editingId: bet.id, stake: (bet.stakeMinor / 100).toFixed(2), fee: bet.feeMinor ? (bet.feeMinor / 100).toFixed(2) : '',
+        sportsbook: bet.sportsbook.key,
         placedAt: toLocalInput(bet.placedAt), totalOdds: bet.totalOddsText ?? '', notes: bet.notes ?? '',
         legs: bet.legs.map((l) => ({ matchId: l.matchId, home: l.home, away: l.away, kickoffUtc: l.kickoffUtc,
           market: l.market, line: l.line, selection: l.selection, playerName: l.playerName, odds: l.oddsText,
@@ -103,6 +104,7 @@ function SlipDrawer() {
   const total = draft.totalOdds ? parseOdds(draft.totalOdds)?.decimal ?? null : product;
   const stakeMinor = parseMoney(draft.stake);
   const payout = total && stakeMinor ? Math.round(stakeMinor * total) : null;
+  const feeMinor = parseMoney(draft.fee) ?? 0;
   /* The bankroll plan for this app's currency, if one is set up. When
    * editing, this bet's own stake is already counted as open. */
   const plan = bankrolls.find((b) => b.currency === currency) ?? null;
@@ -113,7 +115,7 @@ function SlipDrawer() {
     setError(null);
     setSaving(true);
     const body = {
-      sportsbook: draft.sportsbook, stake: draft.stake, totalOdds: draft.legs.length > 1 ? draft.totalOdds : '',
+      sportsbook: draft.sportsbook, stake: draft.stake, fee: draft.fee, totalOdds: draft.legs.length > 1 ? draft.totalOdds : '',
       placedAt: draft.placedAt ? new Date(draft.placedAt).toISOString() : undefined, notes: draft.notes,
       legs: draft.legs.map((l) => ({ matchId: l.matchId, market: l.market, line: l.line, selection: l.selection, odds: l.odds,
         closingOdds: l.closingOdds || undefined })),
@@ -179,7 +181,16 @@ function SlipDrawer() {
                 <label className="slip-field">Bet ({currency})
                   <input value={draft.stake} inputMode="decimal" placeholder="10.00" onChange={(e) => set({ stake: e.target.value })} />
                   <span className="subtle">The amount you put on the bet — what you lose if it loses.</span>
-                  {payout && <span className="subtle">If it wins you get {formatMoney(payout, currency)} back: your {formatMoney(stakeMinor, currency)} plus {formatMoney(payout - stakeMinor, currency)} profit.</span>}
+                  {payout && (
+                    <span className="subtle">
+                      If it wins you get {formatMoney(payout, currency)} back: your {formatMoney(stakeMinor, currency)} plus{' '}
+                      {formatMoney(payout - stakeMinor, currency)}{feeMinor ? `, less ${formatMoney(feeMinor, currency)} fees: ${formatMoney(payout - stakeMinor - feeMinor, currency)} profit` : ' profit'}.
+                    </span>
+                  )}
+                </label>
+                <label className="slip-field">Fees ({currency}, optional)
+                  <input value={draft.fee} inputMode="decimal" placeholder="0.00" onChange={(e) => set({ fee: e.target.value })} />
+                  <span className="subtle">Any fee the app charged on top of the bet. It is counted as spent whatever the result.</span>
                   {plan && !draft.editingId && (
                     <span className="suggested subtle">
                       Your plan suggests a bet of {formatMoney(plan.suggestedStakeMinor, currency)}
@@ -227,7 +238,7 @@ function SlipDrawer() {
           <footer className="slip-footer">
             <div className="slip-summary">
               <span>{draft.legs.length > 1 ? `Parlay of ${draft.legs.length}` : 'Single'} · odds {total ? total.toFixed(2) : '—'}</span>
-              <span>Returns {payout ? formatMoney(payout, currency) : '—'}</span>
+              <span>{feeMinor ? `Costs ${formatMoney((stakeMinor ?? 0) + feeMinor, currency)} · ` : ''}Returns {payout ? formatMoney(payout, currency) : '—'}</span>
             </div>
             <div className="bet-actions">
               <button className="primary" onClick={save} disabled={saving || !payout || !draft.sportsbook}>

@@ -227,3 +227,26 @@ describe('Questions over SokkerLiga\'s own history', () => {
     assert.match(r.answer, /No closing prices have been recorded yet/);
   });
 });
+
+describe('Fees', () => {
+  test('fees come off the profit whatever the result, and count in ROI', () => {
+    saveSportsbook(db, { name: 'Robinhood', currency: 'USD' });
+    const past = league.matchIds[60];
+    const m = db.prepare('SELECT kickoff_utc, home_goals, away_goals FROM matches WHERE id = ?').get(past);
+    const won = m.home_goals > m.away_goals ? 'home' : m.home_goals < m.away_goals ? 'away' : 'draw';
+    const lost = won === 'home' ? 'away' : 'home';
+    const placedAt = new Date(Date.parse(m.kickoff_utc) - 3600_000).toISOString();
+    const a = createBet(db, 'u1', { sportsbook: 'robinhood', stake: '9.52', fee: '0.28', placedAt,
+      legs: [{ matchId: past, market: 'match_result', selection: won, odds: '68%' }] });
+    assert.equal(a.feeMinor, 28);
+    assert.equal(a.profitMinor, Math.round(952 / 0.68) - 952 - 28, 'about $4.20');
+    const b = createBet(db, 'u1', { sportsbook: 'robinhood', stake: '5', fee: '0.10', placedAt,
+      legs: [{ matchId: past, market: 'match_result', selection: lost, odds: '2' }] });
+    assert.equal(b.profitMinor, -510);
+    const t = bettingHistory(db, 'u1').totals;
+    assert.equal(t.feesMinor, 38);
+    assert.ok(Math.abs(t.roi - (a.profitMinor - 510) / (952 + 500 + 38)) < 1e-9);
+    assert.throws(() => createBet(db, 'u1', { sportsbook: 'robinhood', stake: '5', fee: 'abc',
+      legs: [{ matchId: past, market: 'btts', selection: 'yes', odds: '2' }] }), /Fees must be an amount/);
+  });
+});

@@ -94,7 +94,7 @@ function one(db, userId, currency, bets) {
   const withdrawals = ledger.filter((e) => e.kind === 'withdrawal').reduce((a, e) => a + e.amountMinor, 0);
   const profit = settled.reduce((a, b) => a + (b.profitMinor ?? 0), 0);
   const balance = s.starting_minor + deposits - withdrawals + profit;
-  const exposure = open.reduce((a, b) => a + b.stakeMinor, 0);
+  const exposure = open.reduce((a, b) => a + b.stakeMinor + b.feeMinor, 0);
   const cap = Math.max(0, Math.floor((balance * s.max_exposure_pct) / 100) - exposure);
   const plain = suggestedStake(s, balance);
   return {

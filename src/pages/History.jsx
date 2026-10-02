@@ -78,6 +78,7 @@ function Totals({ t, money, currency }) {
       <Kpi label="Wins / losses / pushes" value={`${t.won} / ${t.lost} / ${t.pushed}`} />
       <Kpi label="Win rate" value={pct(t.winRate)} />
       <Kpi label="Total bet" value={money(t.stakedMinor)} />
+      {t.feesMinor > 0 && <Kpi label="Fees" value={money(t.feesMinor)} />}
       <Kpi label="Returned" value={money(t.returnedMinor)} />
       <Kpi label="Net profit" value={<Profit minor={t.profitMinor} currency={currency} format={formatMoney} />} />
       <Kpi label="ROI" value={pct(t.roi)} />

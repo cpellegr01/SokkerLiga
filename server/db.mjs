@@ -71,6 +71,7 @@ export function openDatabase(path = DEFAULT_DB_PATH) {
 const ADDED_COLUMNS = [
   ['jobs', 'quota_priority', "TEXT NOT NULL DEFAULT 'normal'"],
   ['analysis_runs', 'calibration_json', 'TEXT'],
+  ['bets', 'fee_minor', 'INTEGER NOT NULL DEFAULT 0'],
 ];
 
 function addMissingColumns(db) {
