@@ -73,6 +73,7 @@ const ADDED_COLUMNS = [
   ['analysis_runs', 'calibration_json', 'TEXT'],
   ['bets', 'fee_minor', 'INTEGER NOT NULL DEFAULT 0'],
   ['bets', 'contracts', 'REAL'],
+  ['bets', 'limit_price', 'REAL'],
 ];
 
 function addMissingColumns(db) {

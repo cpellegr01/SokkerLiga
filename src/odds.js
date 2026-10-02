@@ -103,3 +103,13 @@ export function formatMoney(minor, currency = 'USD') {
     return `${(minor / 100).toFixed(2)} ${currency}`;
   }
 }
+
+/** A contract price as typed (prediction-market apps): 68, 68¢, 68% or
+ *  0.68 → 0.68. Null outside 1¢–99¢. */
+export function parseContractPrice(input) {
+  const t = String(input ?? '').trim().toLowerCase().replace(/[¢c%$\s]/g, '').replace(',', '.');
+  if (!t || !/^\d*\.?\d+$/.test(t)) return null;
+  const v = Number(t);
+  const p = v < 1 ? v : v / 100;
+  return p > 0 && p < 1 ? Math.round(p * 10000) / 10000 : null;
+}

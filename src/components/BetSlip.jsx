@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import * as api from '../api.js';
 import { go } from '../router.js';
-import { parseOdds, describeOdds, parseMoney, formatMoney, oddsHint } from '../odds.js';
+import { parseOdds, describeOdds, parseMoney, formatMoney, oddsHint, parseContractPrice } from '../odds.js';
 import { MARKET_OPTIONS, selectionLabel } from '../markets.js';
 import { kickoff } from '../format.js';
 import { ErrorBanner } from './ui.jsx';
@@ -18,7 +18,7 @@ const STORE = 'sokkerliga.betslip';
 const load = () => {
   try { return JSON.parse(localStorage.getItem(STORE)) ?? null; } catch { return null; }
 };
-const emptyDraft = () => ({ editingId: null, legs: [], stake: '', fee: '', contracts: '', stakeAuto: false, sportsbook: '', placedAt: '', totalOdds: '', notes: '' });
+const emptyDraft = () => ({ editingId: null, legs: [], stake: '', fee: '', byContracts: false, contracts: '', limitPrice: '', stakeAuto: false, sportsbook: '', placedAt: '', totalOdds: '', notes: '' });
 
 export function BetSlipProvider({ children }) {
   const [draft, setDraft] = useState(() => load() ?? emptyDraft());
@@ -42,7 +42,8 @@ export function BetSlipProvider({ children }) {
     edit(bet) {
       setDraft({
         editingId: bet.id, stake: (bet.stakeMinor / 100).toFixed(2), fee: bet.feeMinor ? (bet.feeMinor / 100).toFixed(2) : '',
-        contracts: bet.contracts ? String(bet.contracts) : '', stakeAuto: false,
+        byContracts: !!bet.contracts, contracts: bet.contracts ? String(bet.contracts) : '',
+        limitPrice: bet.limitPrice ? String(Math.round(bet.limitPrice * 10000) / 100) : '', stakeAuto: false,
         sportsbook: bet.sportsbook.key,
         placedAt: toLocalInput(bet.placedAt), totalOdds: bet.totalOddsText ?? '', notes: bet.notes ?? '',
         legs: bet.legs.map((l) => ({ matchId: l.matchId, home: l.home, away: l.away, kickoffUtc: l.kickoffUtc,
@@ -104,12 +105,17 @@ function SlipDrawer() {
   const product = parsed.every(Boolean) && parsed.length ? parsed.reduce((a, p) => a * p.decimal, 1) : null;
   const total = draft.totalOdds ? parseOdds(draft.totalOdds)?.decimal ?? null : product;
   const stakeMinor = parseMoney(draft.stake);
-  const contracts = Number(String(draft.contracts ?? '').replace(',', '.'));
+  /* Contracts: the limit price replaces the odds; contracts × limit fills
+   * in the bet (until it is typed by hand), and the price actually paid is
+   * bet ÷ contracts. */
+  const contractMode = !!draft.byContracts && draft.legs.length === 1;
+  const contracts = contractMode ? Number(String(draft.contracts ?? '').replace(',', '.')) : 0;
   const hasContracts = contracts > 0;
+  const limit = contractMode ? parseContractPrice(draft.limitPrice) : null;
   const payout = hasContracts ? Math.round(contracts * 100) : total && stakeMinor ? Math.round(stakeMinor * total) : null;
   const feeMinor = parseMoney(draft.fee) ?? 0;
-  /* Contracts × price fills in the bet, until the bet is typed by hand. */
-  const contractCost = hasContracts && total ? Math.round((contracts * 100) / total) : null;
+  const contractCost = hasContracts && limit ? Math.round(contracts * limit * 100) : null;
+  const fillCents = hasContracts && stakeMinor ? Number((stakeMinor / contracts).toFixed(2)) : null;
   useEffect(() => {
     if (contractCost && (draft.stakeAuto || !draft.stake)) {
       const v = (contractCost / 100).toFixed(2);
@@ -126,9 +132,11 @@ function SlipDrawer() {
     setError(null);
     setSaving(true);
     const body = {
-      sportsbook: draft.sportsbook, stake: draft.stake, fee: draft.fee, contracts: draft.contracts, totalOdds: draft.legs.length > 1 ? draft.totalOdds : '',
+      sportsbook: draft.sportsbook, stake: draft.stake, fee: draft.fee,
+      contracts: contractMode ? draft.contracts : '', limitPrice: contractMode ? draft.limitPrice : '', totalOdds: draft.legs.length > 1 ? draft.totalOdds : '',
       placedAt: draft.placedAt ? new Date(draft.placedAt).toISOString() : undefined, notes: draft.notes,
-      legs: draft.legs.map((l) => ({ matchId: l.matchId, market: l.market, line: l.line, selection: l.selection, odds: l.odds,
+      legs: draft.legs.map((l) => ({ matchId: l.matchId, market: l.market, line: l.line, selection: l.selection,
+        odds: contractMode ? '' : l.odds,
         closingOdds: l.closingOdds || undefined })),
     };
     try {
@@ -167,7 +175,7 @@ function SlipDrawer() {
                   </div>
                   <button className="link-button danger" onClick={() => removeLeg(i)}>Remove</button>
                 </div>
-                <label className="slip-field">Odds taken
+                {!contractMode && <><label className="slip-field">Odds taken
                   <input value={l.odds} inputMode="text" autoCapitalize="off" autoCorrect="off" placeholder="2.50, +150, 6/4 or 68%" autoFocus={!l.odds && i === draft.legs.length - 1}
                     onChange={(e) => setLeg(i, { odds: e.target.value })} />
                   <span className="subtle">Type the price exactly as your app shows it: decimal (2.50), American (+150), fractional (6/4),
@@ -176,7 +184,8 @@ function SlipDrawer() {
                 {l.odds && (p
                   ? <span className="subtle">Read as {describeOdds(p.decimal)}: every {formatMoney(100, currency)} bet pays back {formatMoney(Math.round(p.decimal * 100), currency)} if it wins
                     {l.fairOdds ? <ValueNote odds={p.decimal} fair={l.fairOdds} /> : null}</span>
-                  : <OddsHint text={l.odds} onUse={(v) => setLeg(i, { odds: v })} />)}
+                  : <OddsHint text={l.odds} onUse={(v) => setLeg(i, { odds: v })} />)}</>}
+                {contractMode && fillCents && l.fairOdds ? <span className="subtle">At {fillCents}¢<ValueNote odds={100 / fillCents} fair={l.fairOdds} /></span> : null}
               </div>
             );
           })}
@@ -188,26 +197,37 @@ function SlipDrawer() {
 
           {draft.legs.length > 0 && (
             <>
+              {draft.legs.length === 1 && (
+                <label className="check">
+                  <input type="checkbox" checked={!!draft.byContracts}
+                    onChange={(e) => set({ byContracts: e.target.checked, ...(e.target.checked ? {} : { contracts: '', limitPrice: '' }) })} />
+                  Bought as contracts (Robinhood, Kalshi): each pays {formatMoney(100, currency)} if it wins
+                </label>
+              )}
+              {contractMode && (
+                <div className="slip-row">
+                  <label className="slip-field">Contracts
+                    <input value={draft.contracts} inputMode="decimal" placeholder="e.g. 14" onChange={(e) => set({ contracts: e.target.value })} />
+                  </label>
+                  <label className="slip-field">Limit price
+                    <input value={draft.limitPrice ?? ''} inputMode="decimal" placeholder="e.g. 68" onChange={(e) => set({ limitPrice: e.target.value })} />
+                    <span className="subtle">In cents, as on the order: 68 for 68¢.</span>
+                  </label>
+                </div>
+              )}
               <div className="slip-row">
                 <label className="slip-field">Bet ({currency})
                   <input value={draft.stake} inputMode="decimal" placeholder="10.00" onChange={(e) => set({ stake: e.target.value, stakeAuto: false })} />
-                  <span className="subtle">The amount you put on the bet — what you lose if it loses.</span>
+                  <span className="subtle">{contractMode
+                    ? `What the contracts cost${contractCost ? ` — filled in as ${contracts} × ${formatMoney(Math.round(contractCost / contracts), currency)}` : ''}. If the order filled below the limit, type what you actually paid.`
+                    : 'The amount you put on the bet — what you lose if it loses.'}</span>
+                  {contractMode && fillCents && <span className="subtle">You paid {fillCents}¢ per contract.</span>}
                   {payout && (
                     <span className="subtle">
                       If it wins you get {formatMoney(payout, currency)} back: your {formatMoney(stakeMinor, currency)} plus{' '}
                       {formatMoney(payout - stakeMinor, currency)}{feeMinor ? `, less ${formatMoney(feeMinor, currency)} fees: ${formatMoney(payout - stakeMinor - feeMinor, currency)} profit` : ' profit'}.
                     </span>
                   )}
-                </label>
-                <label className="slip-field">Contracts (optional)
-                  <input value={draft.contracts} inputMode="decimal" placeholder="e.g. 14" onChange={(e) => set({ contracts: e.target.value })} />
-                  <span className="subtle">For apps that sell contracts paying {formatMoney(100, currency)} each (Robinhood, Kalshi). With the price,
-                    the bet fills itself in{contractCost ? `: ${contracts} × ${formatMoney(Math.round(100 / total), currency)} = ${formatMoney(contractCost, currency)}` : ''}.
-                    Change the bet if the app shows a different amount.</span>
-                </label>
-                <label className="slip-field">Fees ({currency}, optional)
-                  <input value={draft.fee} inputMode="decimal" placeholder="0.00" onChange={(e) => set({ fee: e.target.value })} />
-                  <span className="subtle">Any fee the app charged on top of the bet. It is counted as spent whatever the result.</span>
                   {plan && !draft.editingId && (
                     <span className="suggested subtle">
                       Your plan suggests a bet of {formatMoney(plan.suggestedStakeMinor, currency)}
@@ -222,6 +242,10 @@ function SlipDrawer() {
                       {' '}{plan.settings.maxExposurePct}% limit of {formatMoney(limitMinor, currency)}.
                     </span>
                   )}
+                </label>
+                <label className="slip-field">Fees ({currency}, optional)
+                  <input value={draft.fee} inputMode="decimal" placeholder="0.00" onChange={(e) => set({ fee: e.target.value })} />
+                  <span className="subtle">Any fee the app charged on top of the bet. It is counted as spent whatever the result.</span>
                 </label>
                 <label className="slip-field">Betting app
                   {books && books.length ? (
@@ -254,7 +278,7 @@ function SlipDrawer() {
         {draft.legs.length > 0 && (
           <footer className="slip-footer">
             <div className="slip-summary">
-              <span>{draft.legs.length > 1 ? `Parlay of ${draft.legs.length}` : 'Single'} · odds {total ? total.toFixed(2) : '—'}</span>
+              <span>{draft.legs.length > 1 ? `Parlay of ${draft.legs.length}` : 'Single'} · {contractMode ? (fillCents ? `${contracts} contracts at ${fillCents}¢` : 'contracts') : `odds ${total ? total.toFixed(2) : '—'}`}</span>
               <span>{feeMinor ? `Costs ${formatMoney((stakeMinor ?? 0) + feeMinor, currency)} · ` : ''}Returns {payout ? formatMoney(payout, currency) : '—'}</span>
             </div>
             <div className="bet-actions">

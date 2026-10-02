@@ -267,3 +267,16 @@ describe('Contracts', () => {
       legs: [{ matchId: past, market: 'btts', selection: 'yes', odds: '68%' }] }), /pay back no more than the bet/);
   });
 });
+
+describe('Contracts with a limit price', () => {
+  test('the limit is kept; the odds come from what was paid per contract', () => {
+    saveSportsbook(db, { name: 'Robinhood', currency: 'USD' });
+    const bet = createBet(db, 'u1', { sportsbook: 'robinhood', stake: '9.24', fee: '0.28', contracts: '14', limitPrice: '68',
+      legs: [{ matchId: league.upcomingId, market: 'btts', selection: 'yes', odds: '' }] });
+    assert.equal(bet.limitPrice, 0.68);
+    assert.equal(bet.legs[0].oddsText, '66¢', 'filled below the limit: 9.24 ÷ 14');
+    assert.equal(bet.potentialPayoutMinor, 1400);
+    assert.throws(() => createBet(db, 'u1', { sportsbook: 'robinhood', stake: '9', limitPrice: '68',
+      legs: [{ matchId: league.upcomingId, market: 'btts', selection: 'no', odds: '' }] }), /needs the number of contracts/);
+  });
+});

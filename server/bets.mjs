@@ -13,7 +13,7 @@
 
 import { ValidationError, transaction } from './db.mjs';
 import { grade, matchFacts, settleBet, playerOf } from './grading.mjs';
-import { parseOdds, parseMoney, oddsHint } from '../src/odds.js';
+import { parseOdds, parseMoney, oddsHint, parseContractPrice } from '../src/odds.js';
 import { selectionLabel } from '../src/markets.js';
 
 const nowIso = () => new Date().toISOString();
@@ -72,6 +72,14 @@ const VALID_SELECTIONS = {
   home_total: ['over', 'under'], away_total: ['over', 'under'], corners_ou: ['over', 'under'], cards_ou: ['over', 'under'],
 };
 
+/* The price actually paid per contract, as odds: 14 contracts for 9.52 is
+ * 68¢ each, decimal 1.4706. */
+function fillOdds(stakeMinor, contracts) {
+  const cents = stakeMinor / contracts;
+  return { decimal: Math.round((contracts * 100 / stakeMinor) * 10000) / 10000, format: 'percent',
+    text: `${Number(cents.toFixed(2))}¢` };
+}
+
 /** Validate and normalise a bet as sent by the bet slip. */
 function normaliseBet(db, input) {
   const book = db.prepare('SELECT * FROM sportsbooks WHERE key = ?').get(input.sportsbook);
@@ -89,6 +97,22 @@ function normaliseBet(db, input) {
   }
   const legs = Array.isArray(input.legs) ? input.legs : [];
   if (!legs.length) throw new ValidationError('A bet needs at least one selection.');
+
+  /* Contracts (Robinhood, Kalshi…): each pays exactly 1.00 if it wins, so
+   * the payout is the contract count. A contract bet can give its limit
+   * price instead of odds: the price actually paid is bet ÷ contracts. */
+  let contracts = null;
+  if (input.contracts !== undefined && input.contracts !== null && String(input.contracts).trim() !== '') {
+    contracts = Number(String(input.contracts).replace(',', '.'));
+    if (!(contracts > 0)) throw new ValidationError('Contracts must be a number above zero, such as 14.');
+    if (contracts * 100 <= stakeMinor) throw new ValidationError('The contracts would pay back no more than the bet; check the bet and the contracts.');
+  }
+  const limitPrice = parseContractPrice(input.limitPrice);
+  if (input.limitPrice && String(input.limitPrice).trim() !== '' && limitPrice === null) {
+    throw new ValidationError('The limit price must be between 1¢ and 99¢, such as 68¢.');
+  }
+  if (limitPrice !== null && !contracts) throw new ValidationError('A limit price needs the number of contracts.');
+  const filled = contracts ? fillOdds(stakeMinor, contracts) : null;
   const placedAt = input.placedAt ? new Date(input.placedAt) : new Date();
   if (Number.isNaN(placedAt.getTime())) throw new ValidationError('That date and time are not valid.');
   if (placedAt.getTime() > Date.now() + 5 * 60_000) throw new ValidationError('A bet cannot be placed in the future.');
@@ -105,7 +129,8 @@ function normaliseBet(db, input) {
     } else if (!VALID_SELECTIONS[leg.market]?.includes(leg.selection)) {
       throw new ValidationError(`Selection ${i + 1}: "${leg.selection}" is not a valid choice for this market.`);
     }
-    const odds = parseOdds(leg.odds);
+    const typed = String(leg.odds ?? '').trim();
+    const odds = !typed && filled && legs.length === 1 ? filled : parseOdds(leg.odds);
     if (!odds) throw new ValidationError(`Selection ${i + 1}: ${oddsHint(leg.odds).message}`);
     const selId = selectionId(db, match.id, leg.market, leg.line, leg.selection);
     if (seen.has(selId)) throw new ValidationError('The same selection is in the bet twice.');
@@ -118,18 +143,9 @@ function normaliseBet(db, input) {
   const total = input.totalOdds ? parseOdds(input.totalOdds) : null;
   if (input.totalOdds && !total) throw new ValidationError('The total odds are not valid.');
   let totalOdds = Math.round((total?.decimal ?? product) * 10000) / 10000;
-
-  /* Contracts (Robinhood, Kalshi…): each pays exactly 1.00 if it wins, so
-   * the payout is the contract count, and the odds follow from it. */
-  let contracts = null;
-  if (input.contracts !== undefined && input.contracts !== null && String(input.contracts).trim() !== '') {
-    contracts = Number(String(input.contracts).replace(',', '.'));
-    if (!(contracts > 0)) throw new ValidationError('Contracts must be a number above zero, such as 14.');
-    if (contracts * 100 <= stakeMinor) throw new ValidationError('The contracts would pay back no more than the bet; check the bet and the contracts.');
-    totalOdds = Math.round(((contracts * 100) / stakeMinor) * 10000) / 10000;
-  }
+  if (contracts) totalOdds = filled.decimal;
   return {
-    book, stakeMinor, feeMinor, contracts, placedAt: placedAt.toISOString(), kind, legs: out, totalOdds,
+    book, stakeMinor, feeMinor, contracts, limitPrice, placedAt: placedAt.toISOString(), kind, legs: out, totalOdds,
     totalOddsText: total?.text ?? null, notes: input.notes?.trim() || null,
     potentialPayoutMinor: contracts ? Math.round(contracts * 100) : Math.round(stakeMinor * totalOdds),
   };
@@ -158,10 +174,10 @@ export function createBet(db, userId, input) {
   const bet = normaliseBet(db, input);
   const id = transaction(db, () => {
     const at = nowIso();
-    const betId = Number(db.prepare(`INSERT INTO bets (user_id, placed_at, sportsbook_key, kind, stake_minor, fee_minor, contracts, currency,
-        total_odds, total_odds_text, potential_payout_minor, notes, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-      .run(userId, bet.placedAt, bet.book.key, bet.kind, bet.stakeMinor, bet.feeMinor, bet.contracts, bet.book.currency, bet.totalOdds,
+    const betId = Number(db.prepare(`INSERT INTO bets (user_id, placed_at, sportsbook_key, kind, stake_minor, fee_minor, contracts, limit_price,
+        currency, total_odds, total_odds_text, potential_payout_minor, notes, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      .run(userId, bet.placedAt, bet.book.key, bet.kind, bet.stakeMinor, bet.feeMinor, bet.contracts, bet.limitPrice, bet.book.currency, bet.totalOdds,
         bet.totalOddsText, bet.potentialPayoutMinor, bet.notes, at, at).lastInsertRowid);
     writeLegs(db, betId, bet);
     return betId;
@@ -190,9 +206,9 @@ export function updateBet(db, userId, id, input) {
     /* The old legs stay, marked replaced, so their settlement history keeps
      * pointing at real rows; the new legs are written alongside. */
     db.prepare('UPDATE bet_legs SET replaced_at = ? WHERE bet_id = ? AND replaced_at IS NULL').run(at, existing.id);
-    db.prepare(`UPDATE bets SET placed_at = ?, sportsbook_key = ?, kind = ?, stake_minor = ?, fee_minor = ?, contracts = ?, currency = ?,
+    db.prepare(`UPDATE bets SET placed_at = ?, sportsbook_key = ?, kind = ?, stake_minor = ?, fee_minor = ?, contracts = ?, limit_price = ?, currency = ?,
                   total_odds = ?, total_odds_text = ?, potential_payout_minor = ?, notes = ?, updated_at = ? WHERE id = ?`)
-      .run(bet.placedAt, bet.book.key, bet.kind, bet.stakeMinor, bet.feeMinor, bet.contracts, bet.book.currency, bet.totalOdds, bet.totalOddsText,
+      .run(bet.placedAt, bet.book.key, bet.kind, bet.stakeMinor, bet.feeMinor, bet.contracts, bet.limitPrice, bet.book.currency, bet.totalOdds, bet.totalOddsText,
         bet.potentialPayoutMinor, bet.notes, at, existing.id);
     writeLegs(db, existing.id, bet);
   });
@@ -340,7 +356,7 @@ function shapeBet(db, b) {
     WHERE l.bet_id = ? AND l.replaced_at IS NULL ORDER BY l.ordinal`).all(b.id);
   return {
     id: b.id, placedAt: b.placed_at, sportsbook: { key: b.sportsbook_key, name: b.sportsbook_name }, kind: b.kind,
-    stakeMinor: b.stake_minor, feeMinor: b.fee_minor ?? 0, contracts: b.contracts ?? null, currency: b.currency, totalOdds: b.total_odds, totalOddsText: b.total_odds_text,
+    stakeMinor: b.stake_minor, feeMinor: b.fee_minor ?? 0, contracts: b.contracts ?? null, limitPrice: b.limit_price ?? null, currency: b.currency, totalOdds: b.total_odds, totalOddsText: b.total_odds_text,
     potentialPayoutMinor: b.potential_payout_minor, notes: b.notes, createdAt: b.created_at, updatedAt: b.updated_at,
     outcome: b.outcome ?? 'pending', profitMinor: b.profit_minor ?? null, settledBy: b.settled_by ?? null,
     legs: legs.map((l) => ({
