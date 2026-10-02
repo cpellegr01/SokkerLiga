@@ -6,7 +6,8 @@
  * provider can never hold up a page.
  *
  * One job at a time, in the order of the jobs table. Jobs that fail are
- * logged in job_runs and retried at their next interval.
+ * logged in job_runs and retried within 15 minutes; on start, any job whose
+ * last run failed runs again at once.
  */
 
 import { openDatabase } from './db.mjs';

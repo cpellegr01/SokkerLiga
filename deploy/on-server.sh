@@ -19,8 +19,9 @@ chown -R sokkerliga:sokkerliga "$APP_DIR"
 echo "==> Restarting"
 systemctl restart sokkerliga
 # The worker exists from v0.2; before its one-time install there is none.
-if systemctl list-unit-files sokkerliga-worker.service >/dev/null 2>&1 \
-   && systemctl list-unit-files sokkerliga-worker.service | grep -q sokkerliga-worker; then
+# (Not `list-unit-files | grep -q`: under pipefail, grep closing the pipe
+# early makes the whole test fail.)
+if systemctl cat sokkerliga-worker >/dev/null 2>&1; then
   systemctl restart sokkerliga-worker
   sleep 1
   echo "worker: $(systemctl is-active sokkerliga-worker)"
