@@ -500,3 +500,25 @@ textarea { padding: 0.45rem 0.6rem; border: 1px solid var(--border); border-radi
   .datepicker-grid { gap: 4px; }
   .datepicker-day { min-height: 40px; }
 }
+
+/* ------------------------------------------------ Phase 4: performance */
+.reliability { display: grid; grid-template-columns: auto 1fr; grid-template-rows: auto auto; gap: 0.3rem 0.5rem; align-items: center; margin-bottom: 0.75rem; }
+.reliability-chart { width: 100%; max-width: 260px; aspect-ratio: 1; display: block; background: var(--surface-2); border-radius: 6px; }
+.reliability-y { writing-mode: vertical-rl; transform: rotate(180deg); white-space: nowrap; }
+.reliability-x { grid-column: 2; white-space: nowrap; }
+.reliability-chart .grid { stroke: var(--border); }
+.reliability-chart .diagonal { stroke: var(--muted); stroke-dasharray: 4 4; }
+.reliability-chart .line { fill: none; stroke: var(--accent); stroke-width: 2; }
+.reliability-chart .dot { fill: var(--accent); fill-opacity: 0.85; }
+.kpi .kpi-label + .kpi-label { margin-top: 0.1rem; }
+
+/* ------------------------------------------------------- Phase 5: ask */
+.ask-form { display: flex; flex-direction: column; gap: 0.6rem; }
+.ask-form textarea { width: 100%; resize: vertical; }
+.ask-examples, .chips { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.chips { margin-bottom: 0.6rem; }
+.chip { border: 1px solid var(--border); background: var(--surface-2); border-radius: 999px; padding: 0.25rem 0.7rem; text-align: left; white-space: normal; max-width: 100%; }
+.chip:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+.suggested { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+.closing-form { display: flex; gap: 0.4rem; align-items: center; flex-wrap: wrap; }
+.closing-form input { width: 7rem; }

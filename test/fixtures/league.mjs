@@ -36,8 +36,8 @@ export function seedLeague(db, { teams = 10, start = Date.now() - 200 * DAY, see
   }
 
   const insertMatch = db.prepare(`INSERT INTO matches (season_id, kickoff_utc, home_team_id, away_team_id, status_key,
-      home_goals, away_goals, referee, result_confirmed_at, source_key, source_ref, fetched_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'api-football', ?, ?)`);
+      home_goals, away_goals, referee, result_confirmed_at, details_fetched_at, source_key, source_ref, fetched_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'api-football', ?, ?)`);
   const insertStat = db.prepare(`INSERT INTO team_match_stats (match_id, team_id, stat_key, value, source_key, fetched_at)
       VALUES (?, ?, ?, ?, 'api-football', ?)`);
   const matchIds = [];
@@ -52,7 +52,7 @@ export function seedLeague(db, { teams = 10, start = Date.now() - 200 * DAY, see
       const la = Math.exp(0.15 + strength[a].attack + strength[h].defence);
       const id = Number(insertMatch.run(seasonId, kickoff, teamIds[h], teamIds[a], 'finished',
         poissonDraw(lh, r), poissonDraw(la, r), n % 3 === 0 ? 'Ref One' : 'Ref Two',
-        new Date(t + 4 * 3600_000).toISOString(), `m${seed}-${n}`, now).lastInsertRowid);
+        new Date(t + 4 * 3600_000).toISOString(), new Date(t + 4 * 3600_000).toISOString(), `m${seed}-${n}`, now).lastInsertRowid);
       insertStat.run(id, teamIds[h], 'corners', poissonDraw(strength[h].corners, r), now);
       insertStat.run(id, teamIds[a], 'corners', poissonDraw(strength[a].corners - 0.8, r), now);
       insertStat.run(id, teamIds[h], 'yellow_cards', poissonDraw(strength[h].cards, r), now);
@@ -63,7 +63,7 @@ export function seedLeague(db, { teams = 10, start = Date.now() - 200 * DAY, see
   }
   const upcomingKickoff = new Date(Date.now() + upcomingInDays * DAY).toISOString();
   const upcomingId = Number(insertMatch.run(seasonId, upcomingKickoff, teamIds[0], teamIds[teams - 1], 'scheduled',
-    null, null, 'Ref One', null, `m${seed}-up`, now).lastInsertRowid);
+    null, null, 'Ref One', null, null, `m${seed}-up`, now).lastInsertRowid);
   return { seasonId, teamIds, upcomingId, matchIds, lastKickoff: new Date(t).toISOString() };
 }
 

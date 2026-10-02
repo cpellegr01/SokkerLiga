@@ -58,3 +58,13 @@ export const updateBet = (id, bet) => request(`/bets/${id}`, { method: 'PUT', bo
 export const deleteBet = (id) => request(`/bets/${id}`, { method: 'DELETE' });
 export const correctSettlement = (id, body) => request(`/bets/${id}/settlements`, { method: 'POST', body: JSON.stringify(body) });
 export const getHistory = (params = {}) => request(`/history${query(params)}`);
+
+/* Phase 4 and 5 */
+export const getPerformance = (params = {}) => request(`/performance${query(params)}`);
+export const getBankroll = () => request('/bankroll');
+export const saveBankroll = (body) => request('/bankroll/settings', { method: 'PUT', body: JSON.stringify(body) });
+export const addLedger = (body) => request('/bankroll/ledger', { method: 'POST', body: JSON.stringify(body) });
+export const setClosingOdds = (betId, legId, closingOdds) =>
+  request(`/bets/${betId}/legs/${legId}/closing`, { method: 'PUT', body: JSON.stringify({ closingOdds }) });
+export const ask = (question) => request('/ask', { method: 'POST', body: JSON.stringify({ question }) });
+export const matchPlayers = (id) => request(`/matches/${id}/players`);

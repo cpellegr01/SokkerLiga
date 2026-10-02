@@ -620,6 +620,12 @@ Each phase ends deployed and verified at sokkerliga.conforza.tech.
   the Analysis tab, values frozen at bet time; automatic settlement with
   manual correction; My Bets; Betting History.
 
+Status (2026-10-01): Phases 0–5 built and deployed. Deliberate differences:
+the learned model runs as a shadow challenger (scored, not used) until
+Claudio chooses to promote it; player markets are anytime scorer only
+(shots markets need per-player shot data the backtest cannot grade yet);
+closing prices are typed in by hand, as there is no odds feed.
+
 **Phase 4 — performance and calibration**
 - Model Performance (Brier, log loss, reliability diagrams, breakdowns by
   segment and version); calibration layer; confidence informed by

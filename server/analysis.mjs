@@ -1,9 +1,14 @@
 /* Analyze Match: the pipeline from inputs to recommendations.
  *
  *   1 features   buildFeatures(match, asOf)            → feature_snapshots
- *   2 probability goals and count models               → predictions
+ *   2 probability goals, count and scorer models         → predictions
+ *     calibrate  latest fit per market (Phase 4)        → calibrated_probability
  *   3 explain    the explainer (Claude) reads the packet → ai_explanations, factors
  *   4 recommend  thresholds in force                    → recommendations
+ *
+ * Decisions and fair odds use the calibrated probability where a fit
+ * applied; the raw model probability is kept beside it. The learned
+ * challenger's match-result view is logged alongside, never used.
  *
  * Predictions are written before Claude is asked anything, so the
  * statistical view stands even when the explanation fails, and its
@@ -15,10 +20,14 @@ import { ValidationError, transaction } from './db.mjs';
 import { buildFeatures, BUILDER_VERSION } from './features.mjs';
 import { lambdas, scoreMatrix, MODEL_KEY, MODEL_VERSION, round } from './model/goals.mjs';
 import { priceGoalsMarkets, priceCountMarket, CORNER_LINES, CARD_LINES } from './model/markets.mjs';
+import { priceScorers } from './model/players.mjs';
+import { calibratePriced, reliabilityFactor } from './model/calibration.mjs';
+import { learnedInputs, predictLearned, LEARNED_KEY } from './model/learned.mjs';
+import { calibrationFor, latestLearned } from './performance.mjs';
 import { selectionLabel } from '../src/markets.js';
 
 export const BANDS = ['low', 'medium', 'high'];
-const band = (score) => (score >= 0.75 ? 'high' : score >= 0.5 ? 'medium' : 'low');
+export const band = (score) => (score >= 0.75 ? 'high' : score >= 0.5 ? 'medium' : 'low');
 
 const DEFAULT_THRESHOLDS = { minConfidence: 'medium', minProbability: 0.55, minFairOdds: 1.3, maxFairOdds: 2.5, markets: [] };
 
@@ -144,6 +153,34 @@ export function priceMatch(built) {
   return out.map((x) => ({ ...x, p: round(x.p, 4) }));
 }
 
+/** Anytime scorers for both sides, from the goals model's expected goals. */
+export function priceScorerMarkets(db, built, asOf) {
+  const { model } = built;
+  if (!model.fit.ok) return [];
+  const l = lambdas(model.fit, model.homeId, model.awayId, model.competitionId);
+  return priceScorers(db, {
+    matchId: built.features.match.id, asOf, cutoff: model.cutoff,
+    sides: [{ teamId: model.homeId, lambda: l.home }, { teamId: model.awayId, lambda: l.away }],
+  }).map((x) => ({ ...x, p: round(x.p, 4), confidenceBand: band(x.confidenceScore) }));
+}
+
+/**
+ * Calibration and calibration-informed confidence. Each row gains `pCal`
+ * (null where no fit applied) and `pUse`, the probability decisions and fair
+ * odds are based on; confidence is scaled by how well calibrated that market
+ * has been. Returns { rows, applied } — applied: market → calibration id.
+ */
+export function finalisePriced(db, priced, asOf) {
+  const fits = calibrationFor(db, MODEL_KEY, MODEL_VERSION, asOf);
+  const rows = calibratePriced(priced, fits).map((x) => {
+    const factor = reliabilityFactor(fits.get(x.market));
+    const score = round(x.confidenceScore * factor, 3);
+    return { ...x, pUse: x.pCal ?? x.p, confidenceScore: score, confidenceBand: band(score) };
+  });
+  const applied = Object.fromEntries([...fits].filter(([, f]) => f.applied).map(([m, f]) => [m, f.id]));
+  return { rows, applied };
+}
+
 /* ---------------------------------------------------------------- run */
 
 function selectionId(db, matchId, market, line, selection) {
@@ -192,9 +229,11 @@ export async function runAnalysis(db, runId, { explainer = null, now = () => new
 
   let built;
   let priced;
+  let applied;
   try {
     built = buildFeatures(db, match.id, asOf);
-    priced = priceMatch(built);
+    const raw = [...priceMatch(built), ...priceScorerMarkets(db, built, asOf)];
+    ({ rows: priced, applied } = finalisePriced(db, raw, asOf));
   } catch (error) {
     return fail(`Could not build the analysis: ${error.message}`);
   }
@@ -203,8 +242,8 @@ export async function runAnalysis(db, runId, { explainer = null, now = () => new
   }
 
   const thresholds = thresholdsFor(db, run.requested_by, asOf);
-  const decisions = priced.map((x) => decide({ ...x, confidenceBand: x.confidenceBand }, thresholds));
-  const label = (x) => selectionLabel(x.market, x.line, x.selection, match.home_name, match.away_name);
+  const decisions = priced.map((x) => decide({ ...x, p: x.pUse }, thresholds));
+  const label = (x) => selectionLabel(x.market, x.line, x.selection, match.home_name, match.away_name, x.playerName);
 
   /* Freeze the inputs and the predictions in one transaction. */
   const predictionIds = transaction(db, () => {
@@ -212,20 +251,31 @@ export async function runAnalysis(db, runId, { explainer = null, now = () => new
         (match_id, as_of, builder_version, features_json, data_freshness_json, sha256, created_at)
         VALUES (?, ?, ?, ?, ?, ?, ?)`)
       .run(match.id, asOf, BUILDER_VERSION, built.json, JSON.stringify(built.freshness), built.sha256, asOf).lastInsertRowid);
-    db.prepare('UPDATE analysis_runs SET feature_snapshot_id = ?, prob_model_key = ?, prob_model_version = ? WHERE id = ?')
-      .run(snapshotId, MODEL_KEY, MODEL_VERSION, runId);
+    db.prepare(`UPDATE analysis_runs SET feature_snapshot_id = ?, prob_model_key = ?, prob_model_version = ?,
+                  calibration_json = ? WHERE id = ?`)
+      .run(snapshotId, MODEL_KEY, MODEL_VERSION, JSON.stringify(applied), runId);
     const insert = db.prepare(`INSERT INTO predictions (analysis_run_id, match_id, selection_id, model_probability,
-        fair_odds, confidence_score, confidence_band, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`);
+        calibrated_probability, fair_odds, confidence_score, confidence_band, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`);
     const supersede = db.prepare(`UPDATE predictions SET superseded_by = ?
                                   WHERE match_id = ? AND selection_id = ? AND superseded_by IS NULL AND id <> ?`);
     return priced.map((x) => {
       const sel = selectionId(db, match.id, x.market, x.line, x.selection);
-      const id = Number(insert.run(runId, match.id, sel, x.p, round(1 / x.p, 3), x.confidenceScore, x.confidenceBand, asOf)
-        .lastInsertRowid);
+      const id = Number(insert.run(runId, match.id, sel, x.p, x.pCal, round(1 / x.pUse, 3), x.confidenceScore,
+        x.confidenceBand, asOf).lastInsertRowid);
       supersede.run(id, match.id, sel, id);
       return id;
     });
   });
+
+  /* The learned challenger's view of the result, logged in the shadow. */
+  const learned = latestLearned(db, asOf);
+  const inputs = learned ? learnedInputs(built, priced) : null;
+  if (learned && inputs) {
+    const view = predictLearned(JSON.parse(learned.weights_json), inputs.values);
+    const ins = db.prepare(`INSERT INTO challenger_predictions (analysis_run_id, match_id, model_key, model_version,
+                              selection, probability, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`);
+    for (const sel of ['home', 'draw', 'away']) ins.run(runId, match.id, LEARNED_KEY, learned.version, sel, round(view[sel], 4), asOf);
+  }
 
   /* Ask the explainer. Its failure is recorded, never fatal. */
   const candidateIdx = candidatesFor(priced, decisions);
@@ -237,7 +287,7 @@ export async function runAnalysis(db, runId, { explainer = null, now = () => new
     try {
       const candidates = candidateIdx.map((i) => ({
         candidate_id: String(predictionIds[i]), selection: label(priced[i]), market: priced[i].market,
-        probability: priced[i].p, fair_odds: round(1 / priced[i].p, 2), confidence: priced[i].confidenceBand,
+        probability: priced[i].pUse, fair_odds: round(1 / priced[i].pUse, 2), confidence: priced[i].confidenceBand,
         sokkerliga_decision: decisions[i].decision,
       }));
       const result = await explainer.explain({ packet: built.features, candidates });
@@ -286,8 +336,11 @@ export async function runAnalysis(db, runId, { explainer = null, now = () => new
 /* --------------------------------------------------------------- reads */
 
 const PREDICTION_SELECT = `
-  SELECT p.id, p.analysis_run_id AS runId, p.match_id AS matchId, p.model_probability AS probability,
-         p.fair_odds AS fairOdds, p.confidence_score AS confidenceScore, p.confidence_band AS confidence,
+  SELECT p.id, p.analysis_run_id AS runId, p.match_id AS matchId,
+         COALESCE(p.calibrated_probability, p.model_probability) AS probability,
+         p.model_probability AS rawProbability, p.calibrated_probability AS calibratedProbability,
+         p.fair_odds AS fairOdds,
+         (SELECT name FROM players pl WHERE s.key LIKE 'p:%' AND pl.id = CAST(substr(s.key, 3) AS INTEGER)) AS playerName, p.confidence_score AS confidenceScore, p.confidence_band AS confidence,
          p.created_at AS createdAt, p.superseded_by AS supersededBy,
          mk.market_type_key AS market, mk.line, s.key AS selection, mt.name AS marketName, mt.family, mt.ordinal,
          r.decision, r.pass_reasons_json, r.ai_stance AS aiStance,
@@ -308,7 +361,7 @@ export function analysisForMatch(db, matchId) {
   const factors = db.prepare('SELECT direction, label, evidence FROM prediction_factors WHERE prediction_id = ? ORDER BY id');
   const predictions = db.prepare(`${PREDICTION_SELECT} WHERE p.analysis_run_id = ? ORDER BY mt.ordinal, mk.line, s.key`)
     .all(latest.id).map((p) => ({
-      ...p, label: selectionLabel(p.market, p.line, p.selection, match.home, match.away),
+      ...p, label: selectionLabel(p.market, p.line, p.selection, match.home, match.away, p.playerName),
       passReasons: JSON.parse(p.pass_reasons_json ?? '[]'),
       factors: factors.all(p.id),
     }));
@@ -317,6 +370,8 @@ export function analysisForMatch(db, matchId) {
     .get(latest.feature_snapshot_id);
   const features = snapshot ? JSON.parse(snapshot.features_json) : null;
   const thresholds = db.prepare('SELECT thresholds_json FROM recommendations WHERE analysis_run_id = ? LIMIT 1').get(latest.id);
+  const challenger = db.prepare(`SELECT model_version AS version, selection, probability FROM challenger_predictions
+                                 WHERE analysis_run_id = ?`).all(latest.id);
   return {
     runs, pending,
     latest: {
@@ -328,6 +383,10 @@ export function analysisForMatch(db, matchId) {
         keyFactors: JSON.parse(explanation.key_factors_json), dataGaps: JSON.parse(explanation.data_gaps_json),
       } : null,
       goalsModel: features?.goalsModel ?? null,
+      calibrated: Object.keys(JSON.parse(latest.calibration_json ?? '{}')),
+      challenger: challenger.length ? {
+        version: challenger[0].version, ...Object.fromEntries(challenger.map((c) => [c.selection, c.probability])),
+      } : null,
       freshness: snapshot ? JSON.parse(snapshot.data_freshness_json) : null,
       snapshot: snapshot ? { asOf: snapshot.as_of, sha256: snapshot.sha256 } : null,
     },
@@ -361,6 +420,6 @@ export function listPredictions(db, { decision, market, competition, from, to, i
     JOIN teams ht ON ht.id = m.home_team_id JOIN teams at ON at.id = m.away_team_id
     WHERE ${where.join(' AND ')}
     ORDER BY m.kickoff_utc DESC, x.ordinal, x.line, x.selection LIMIT ?`).all(...args, Number(limit));
-  return rows.map((p) => ({ ...p, label: selectionLabel(p.market, p.line, p.selection, p.home, p.away),
+  return rows.map((p) => ({ ...p, label: selectionLabel(p.market, p.line, p.selection, p.home, p.away, p.playerName),
     passReasons: JSON.parse(p.pass_reasons_json ?? '[]') }));
 }

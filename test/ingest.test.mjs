@@ -27,9 +27,12 @@ beforeEach(() => {
 const count = (table, where = '1=1', ...args) => db.prepare(`SELECT COUNT(*) AS n FROM ${table} WHERE ${where}`).get(...args).n;
 
 describe('Seed data', () => {
-  test('the eight competitions are seeded with their provider ids', () => {
-    const rows = db.prepare('SELECT key, api_football_id FROM competitions ORDER BY ordinal').all();
-    assert.equal(rows.length, 8);
+  test('the eight original competitions are on, the nine added in Phase 5 off, all with provider ids', () => {
+    const rows = db.prepare('SELECT key, api_football_id, is_enabled FROM competitions ORDER BY ordinal').all();
+    assert.equal(rows.length, 17);
+    assert.equal(rows.filter((r) => r.is_enabled).length, 8);
+    assert.ok(rows.every((r) => r.api_football_id > 0));
+    assert.equal(rows.find((r) => r.key === 'championship').api_football_id, 40);
     assert.equal(rows.find((r) => r.key === 'premier-league').api_football_id, 39);
     assert.equal(rows.find((r) => r.key === 'mls').api_football_id, 253);
   });

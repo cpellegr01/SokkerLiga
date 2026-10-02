@@ -558,3 +558,26 @@ export function dashboard(db, userId, { dayStart, dayEnd } = {}) {
         (SELECT COUNT(*) FROM matches WHERE details_fetched_at IS NOT NULL) AS matchesWithDetails`).get(),
   };
 }
+
+/* ------------------------------------------------------- match players */
+
+/** Both squads for one match, for picking a player market in the bet slip:
+ *  current squad members, most goals in the last year first. */
+export function matchPlayers(db, id) {
+  const m = db.prepare(`SELECT m.home_team_id, m.away_team_id, m.kickoff_utc, ht.name AS home, at.name AS away
+                        FROM matches m JOIN teams ht ON ht.id = m.home_team_id JOIN teams at ON at.id = m.away_team_id
+                        WHERE m.id = ?`).get(Number(id));
+  if (!m) throw new ValidationError('That match does not exist.', 404);
+  const since = new Date(Date.parse(m.kickoff_utc) - 365 * 86400_000).toISOString();
+  const squad = db.prepare(`
+    SELECT p.id, p.name, COALESCE(r.position, p.position) AS position,
+           (SELECT COALESCE(SUM(ps.goals), 0) FROM player_match_stats ps JOIN matches x ON x.id = ps.match_id
+            WHERE ps.player_id = p.id AND x.kickoff_utc BETWEEN ? AND ?) AS goals
+    FROM team_rosters r JOIN players p ON p.id = r.player_id
+    WHERE r.team_id = ? AND r.valid_to IS NULL AND COALESCE(r.position, p.position, '') <> 'Goalkeeper'
+    ORDER BY goals DESC, p.name`);
+  return {
+    home: { name: m.home, players: squad.all(since, m.kickoff_utc, m.home_team_id) },
+    away: { name: m.away, players: squad.all(since, m.kickoff_utc, m.away_team_id) },
+  };
+}

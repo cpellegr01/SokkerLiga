@@ -215,8 +215,11 @@ function lineup(db, matchId, teamId, asOf) {
  * Returns { features, freshness, model, history } — `history` (the matches
  * the model was fitted on) is not stored in the snapshot; it can be rebuilt
  * from the database with the same asOf.
+ *
+ * `cache` (a Map) lets the backtest price a whole match day from one fit:
+ * the known results and the ratings depend only on asOf, never on the match.
  */
-export function buildFeatures(db, matchId, asOf) {
+export function buildFeatures(db, matchId, asOf, { cache = null } = {}) {
   const m = db.prepare(`
     SELECT m.*, s.competition_id, s.label AS season_label, c.name AS competition_name, c.kind AS competition_kind,
            ht.name AS home_name, at.name AS away_name
@@ -225,12 +228,14 @@ export function buildFeatures(db, matchId, asOf) {
   if (!m) throw new Error('That match does not exist.');
 
   const cutoff = iso(Date.parse(asOf) - RESULT_LAG_MS);
-  const history = knownResults(db, asOf);
+  const cached = cache?.get(asOf);
+  const history = cached?.history ?? knownResults(db, asOf);
   const H = m.home_team_id;
   const A = m.away_team_id;
 
   /* ------- the goals model, fitted on everything known before asOf */
-  const fit = fitRatings(history, { asOf: cutoff });
+  const fit = cached?.fit ?? fitRatings(history, { asOf: cutoff });
+  if (cache && !cached) cache.set(asOf, { history, fit });
   let goals = null;
   if (fit.ok) {
     const l = lambdas(fit, H, A, m.competition_id);
@@ -329,6 +334,7 @@ export function buildFeatures(db, matchId, asOf) {
   return {
     features, freshness, json,
     sha256: createHash('sha256').update(json).digest('hex'),
-    model: { fit, goals, corners, cards, competitionId: m.competition_id, homeId: H, awayId: A },
+    model: { fit, goals, corners, cards, competitionId: m.competition_id, homeId: H, awayId: A, cutoff,
+      competitionKind: m.competition_kind },
   };
 }

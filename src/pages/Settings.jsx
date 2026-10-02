@@ -48,6 +48,11 @@ export default function Settings() {
                 : <span className="pill failed">No key</span>}
               {!sync.data.explainerConfigured && <span className="subtle"> · Analyses still run, without the written explanation. Add ANTHROPIC_API_KEY to the same file.</span>}
             </p>
+            <p className="subtle">
+              Requests are planned around the daily quota: {sync.data.quotaReserve.toLocaleString()} are kept each day for results and
+              lineups. Below that, league tables and injury reports wait for tomorrow; below twice that, squads, player profiles and
+              the history backfill do. Tables are only checked after a matchday, injuries only before one. "Run now" always runs.
+            </p>
             {!sync.data.providerConfigured && (
               <p className="subtle small">The key lives on the server in /etc/sokkerliga/sokkerliga.env as API_FOOTBALL_KEY. It is never shown here.</p>
             )}
@@ -60,7 +65,8 @@ export default function Settings() {
                 <tbody>
                   {sync.data.jobs.map((j) => (
                     <tr key={j.key}>
-                      <td><strong>{j.name}</strong><div className="subtle small">{j.description}</div></td>
+                      <td><strong>{j.name}</strong><div className="subtle small">{j.description}</div>
+                        {j.quotaPriority === 'deferrable' && <div className="subtle small">Waits when requests run low.</div>}</td>
                       <td className="hide-sm">{every(j.intervalMinutes)}</td>
                       <td>{ago(j.lastSuccessAt)}</td>
                       <td>
@@ -90,7 +96,9 @@ export default function Settings() {
       <BettingApps />
 
       <h2>Competitions</h2>
-      <p className="subtle">Switched-off competitions are not refreshed and are hidden from match lists. Their history is kept.</p>
+      <p className="subtle">Switched-off competitions are not refreshed and are hidden from match lists. Their history is kept.
+        Switching one on fetches its season, teams, fixtures, table and squads straight away; run "Past seasons" above to add its
+        history, which the backtest and the model then use.</p>
       <ErrorBanner error={comps.error} />
       {!comps.data ? <Loading /> : (
         <div className="card">

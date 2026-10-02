@@ -89,6 +89,12 @@ function RunHeader({ latest, button, pending, started }) {
           {freshness && ` · ${freshness.resultsKnown.toLocaleString()} results known, latest ${freshness.latestResultUsed?.slice(0, 10) ?? '—'}`}
           {freshness && (freshness.lineupsConfirmed ? ' · Lineups confirmed' : ' · Lineups not yet known')}
         </p>
+        {latest.calibrated?.length > 0 && (
+          <p className="subtle">
+            Calibrated against past results for {latest.calibrated.length} market{latest.calibrated.length === 1 ? '' : 's'} ·{' '}
+            <a href={href('performance')}>How calibration works</a>
+          </p>
+        )}
         {thresholds && (
           <p className="subtle">
             Thresholds used: confidence {thresholds.minConfidence} or better, probability ≥ {Math.round(thresholds.minProbability * 100)}%,
@@ -120,6 +126,12 @@ function ModelView({ latest, match }) {
         Most likely scores:{' '}
         {g.likelyScores.map((s) => `${s.home}–${s.away} (${pct(s.p)})`).join(' · ')}
       </p>
+      {latest.challenger && (
+        <p className="subtle">
+          Learned challenger (v{latest.challenger.version}, in the shadow — not used for recommendations):{' '}
+          {match.home.name} {pct(latest.challenger.home)} · draw {pct(latest.challenger.draw)} · {match.away.name} {pct(latest.challenger.away)}
+        </p>
+      )}
     </div>
   );
 }
@@ -241,7 +253,10 @@ function AllMarkets({ predictions, match }) {
                 ...rows.map((p) => (
                   <tr key={p.id}>
                     <td>{p.label}</td>
-                    <td className="num">{pct(p.probability)}</td>
+                    <td className="num" title={p.calibratedProbability !== null ? `Model ${pct(p.rawProbability)}, calibrated ${pct(p.calibratedProbability)}` : undefined}>
+                      {pct(p.probability)}
+                      {p.calibratedProbability !== null && <span className="subtle hide-sm"> (model {pct(p.rawProbability)})</span>}
+                    </td>
                     <td className="num">{p.fairOdds.toFixed(2)}</td>
                     <td>{CONFIDENCE_LABEL[p.confidence]}</td>
                     <td title={p.passReasons.join('\n')}>
@@ -265,5 +280,5 @@ function AllMarkets({ predictions, match }) {
  * so the slip can show whether the price taken beats it. */
 const legFrom = (p, match) => ({
   matchId: match.id, home: match.home.name, away: match.away.name, kickoffUtc: match.kickoffUtc,
-  market: p.market, line: p.line, selection: p.selection, fairOdds: p.fairOdds,
+  market: p.market, line: p.line, selection: p.selection, playerName: p.playerName, fairOdds: p.fairOdds,
 });

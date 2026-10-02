@@ -115,7 +115,7 @@ describe('Read models', () => {
   });
 
   test('lists and dashboard', () => {
-    assert.equal(listCompetitions(db).length, 8);
+    assert.equal(listCompetitions(db).length, 17);
     assert.equal(listTeams(db).length, 2);
     assert.equal(listPlayers(db, { q: 'Jesus' })[0].name, 'Gabriel Jesus');
     const d = dashboard(db, 'u1');

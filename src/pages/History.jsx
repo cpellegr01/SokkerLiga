@@ -83,6 +83,10 @@ function Totals({ t, money, currency }) {
       <Kpi label="ROI" value={pct(t.roi)} />
       <Kpi label="Average odds" value={t.averageOdds ? t.averageOdds.toFixed(2) : '—'} />
       <Kpi label="Average edge" value={t.averageEdge === null ? '—' : `${(t.averageEdge * 100).toFixed(1)} pts`} />
+      {t.closing.legs > 0 && (
+        <Kpi label={`Beat the closing price (${t.closing.beat} of ${t.closing.legs})`}
+          value={<span className={t.closing.averageClv > 0 ? 'profit-up' : 'profit-down'}>{pct(t.closing.averageClv)}</span>} />
+      )}
     </div>
   );
 }

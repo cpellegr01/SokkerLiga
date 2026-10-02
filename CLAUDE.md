@@ -77,6 +77,65 @@ data can reference people by id.
 - UI: `src/components/BetSlip.jsx` (drawer; full-screen on phones; draft
   kept in localStorage), `pages/Bets.jsx`, `pages/History.jsx`.
 
+## Code map (Phase 4 — performance and calibration)
+
+- `server/backtest.mjs` — the model re-run for past matches as of an hour
+  before each match day's first kickoff, through the SAME `buildFeatures()` /
+  `priceMatch()` as live (a per-asOf fit cache makes a match day one fit).
+  Raw probabilities only; each selection graded at write time. Only matches
+  with details fetched. Paced: `backtest_seconds_per_run` (45 s) per run,
+  yields between days. Job `backtest_model`, every 10 min.
+- `scored_predictions_v1` (view, schema.sql) — every graded selection, live
+  and backtest, as (p, y, w). A changed definition is a NEW view name.
+- `server/performance.mjs` — Model Performance: one SQL pass builds a cube
+  (source × competition × confidence × model × month × selection × 10%
+  bucket), cached in the API until data change; filters/breakdowns roll up
+  in memory. Team / favourite / exact-date / threshold filters go to SQL.
+  Also the jobs' work: `fitCalibrations` (isotonic per market, trial fit on
+  oldest 80% by count, applied only if it beat raw on the newest 20%;
+  dated, append-only rows), `trainChallenger`, `snapshotPerformance`.
+- `server/model/calibration.mjs` — PAV, interpolation, bin metrics,
+  `calibratePriced` (renormalises each market/line group; double chance is
+  rebuilt from calibrated 1X2, never fitted), `reliabilityFactor`
+  (confidence × 0.8–1 from the market's calibration error).
+- Analysis now stores `calibrated_probability` beside `model_probability`;
+  fair odds and decisions use the calibrated one; `analysis_runs.
+  calibration_json` records which fits applied. Bets freeze the calibrated
+  probability when there is one.
+- `server/model/learned.mjs` — the challenger: multinomial logistic
+  regression starting AT Dixon–Coles (inputs include DC's log-odds) with a
+  penalty pulling back to it. SHADOW ONLY: logged in
+  `challenger_predictions`, scored on Model Performance, never used for
+  recommendations. Promoting it is a decision for Claudio.
+- Job `calibrate_and_train`, every 6 h, no provider requests.
+
+## Code map (Phase 5 — depth)
+
+- Bankroll (`server/bankroll.mjs`, `pages/Bankroll.jsx`): per currency;
+  balance = start + deposits − withdrawals + settled profit since the start
+  date; exposure = open stakes; flat / percent / unit plans; suggested stake
+  capped by the exposure limit; shown in the bet slip. Dated settings rows,
+  append-only ledger (triggers).
+- Player markets: `anytime_scorer` only (`server/model/players.mjs`):
+  player's share of team scoring per minute (shrunk to a position prior) ×
+  expected minutes × the goals model's team λ. Selection key `p:<player id>`;
+  `selectionLabel(..., playerName)`. Graded on regular-time goals, own goals
+  excluded, no appearance = void. Not in the backtest.
+- More competitions: nine more seeded, switched off; switching one on
+  requests the season/teams/fixtures/table/squads jobs at once.
+- Quota-aware scheduling (`jobs.mjs`): `jobs.quota_priority` essential /
+  normal / deferrable; below `quota_reserve` (750) normal jobs wait for the
+  next UTC day, below twice that deferrable ones; "Run now" overrides. The
+  results backlog never spends into the reserve. Standings only after a
+  matchday, injuries only before one.
+- Ask (`server/ask.mjs`, `server/ai/questions.mjs`, `pages/Ask.jsx`): Claude
+  turns the question into a filter (structured output, effort low, prompt
+  `question-filter.v1.md`, registered with checksum like the other); the
+  server validates it and computes every number. Claude never sees data.
+- Closing prices: typed per leg on My Bets (`PUT /api/bets/:id/legs/:leg/
+  closing`); closing-line value in Betting History and Ask.
+- Columns added to existing tables go in `ADDED_COLUMNS` (db.mjs).
+
 Deviations from `docs/architecture.md`, deliberately small: no `stages`
 table (round text on matches, group name on standings); logos/photos are
 columns rather than an `images` table; `ingest.mjs`/`jobs.mjs` are single

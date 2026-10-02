@@ -13,6 +13,8 @@
  *  - Draw no bet: a draw is a push.
  *  - Postponed, cancelled or abandoned: pending for 48 hours, then void.
  *    Awarded matches (decided off the pitch) are void.
+ *  - Anytime scorer: a goal in regular time (stoppage time included, extra
+ *    time not); own goals do not count; a player who did not play is void.
  */
 
 const VOID_AFTER_MS = 48 * 3600_000;
@@ -30,9 +32,17 @@ export function matchFacts(db, matchId) {
     const away = rows.find((r) => r.team_id === m.away_team_id)?.v;
     return home === undefined || away === undefined || home === null || away === null ? null : home + away;
   };
+  /* Who scored in regular time (minute 90 + stoppage is still regular
+   * time; extra time is minute 91 onward), and who played at all. */
+  const scorers = new Set(db.prepare(`SELECT player_id FROM match_events WHERE match_id = ? AND player_id IS NOT NULL
+                                        AND type_key IN ('goal', 'penalty_goal') AND COALESCE(minute, 0) <= 90`)
+    .all(matchId).map((r) => r.player_id));
+  const appearances = db.prepare('SELECT player_id, minutes FROM player_match_stats WHERE match_id = ?').all(matchId);
   return {
     status: m.status_key,
     kickoffUtc: m.kickoff_utc,
+    scorers,
+    played: appearances.length ? new Set(appearances.filter((r) => (r.minutes ?? 0) > 0).map((r) => r.player_id)) : null,
     confirmed: !!m.result_confirmed_at,
     /* Regular time: extra-time goals come off the final score. */
     home: m.home_goals === null ? null : m.home_goals - (m.home_et ?? 0),
@@ -84,12 +94,24 @@ export function grade(market, line, selection, facts, now = Date.now()) {
       const adj = diff + line;
       return outcome(selection === 'home' ? adj > 0 : selection === 'away' ? adj < 0 : adj === 0);
     }
+    case 'anytime_scorer': {
+      const id = playerOf(selection);
+      if (id === null || !facts.played) return null;
+      if (!facts.played.has(id)) return 'void';
+      return outcome(facts.scorers.has(id));
+    }
     default:
       return null;
   }
 }
 
 const outcome = (won) => (won ? 'won' : 'lost');
+
+/** Player markets key their selection by player: 'p:123'. */
+export const playerOf = (selection) => {
+  const m = /^p:(\d+)$/.exec(selection ?? '');
+  return m ? Number(m[1]) : null;
+};
 
 function total(n, line, selection) {
   if (n === line) return 'push';

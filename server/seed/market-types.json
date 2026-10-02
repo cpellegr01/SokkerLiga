@@ -9,5 +9,6 @@
   { "key": "home_total",        "name": "Home team total goals", "family": "goals",   "has_line": 1, "ordinal": 8,  "description": "Home team's goals over or under the line." },
   { "key": "away_total",        "name": "Away team total goals", "family": "goals",   "has_line": 1, "ordinal": 9,  "description": "Away team's goals over or under the line." },
   { "key": "corners_ou",        "name": "Total corners",         "family": "corners", "has_line": 1, "ordinal": 10, "description": "Total corners over or under the line." },
-  { "key": "cards_ou",          "name": "Total cards",           "family": "cards",   "has_line": 1, "ordinal": 11, "description": "Total yellow and red cards over or under the line (a second yellow counts as two cards: yellow plus red)." }
+  { "key": "cards_ou",          "name": "Total cards",           "family": "cards",   "has_line": 1, "ordinal": 11, "description": "Total yellow and red cards over or under the line (a second yellow counts as two cards: yellow plus red)." },
+  { "key": "anytime_scorer",    "name": "Anytime goalscorer",    "family": "players", "has_line": 0, "ordinal": 12, "description": "The player scores in regular time (own goals do not count). A player who does not play is void." }
 ]

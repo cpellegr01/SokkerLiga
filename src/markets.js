@@ -3,8 +3,12 @@
 
 const signed = (x) => (x > 0 ? `+${x}` : x < 0 ? `−${Math.abs(x)}` : '0');
 
-export function selectionLabel(market, line, selection, home, away) {
+/* Player markets key the selection as 'p:<player id>'; pass the player's
+ * name as `playerName` to label it. */
+export function selectionLabel(market, line, selection, home, away, playerName = null) {
   switch (market) {
+    case 'anytime_scorer':
+      return `${playerName ?? 'Player'} to score`;
     case 'match_result':
       return selection === 'home' ? `${home} to win` : selection === 'away' ? `${away} to win` : 'Draw';
     case 'double_chance':
@@ -49,6 +53,7 @@ export const MARKET_OPTIONS = [
   { key: 'away_total', name: 'Away team total goals', line: true, defaultLine: 1.5, selections: ['over', 'under'] },
   { key: 'corners_ou', name: 'Total corners', line: true, defaultLine: 9.5, selections: ['over', 'under'] },
   { key: 'cards_ou', name: 'Total cards', line: true, defaultLine: 4.5, selections: ['over', 'under'] },
+  { key: 'anytime_scorer', name: 'Anytime goalscorer', line: false, player: true, selections: [] },
 ];
 
 export const OUTCOME_LABEL = {

@@ -15,12 +15,17 @@ import { openDatabase, ValidationError } from './db.mjs';
 import { identityFrom, recordVisit } from './identity.mjs';
 import {
   dashboard, listMatches, matchCenter, teamProfile, playerProfile, listPlayers, listTeams,
-  listCompetitions, competitionDetail, setCompetitionEnabled, search, favourites, setFavourite,
+  listCompetitions, competitionDetail, setCompetitionEnabled, search, favourites, setFavourite, matchPlayers,
 } from './queries.mjs';
 import { syncStatus, requestRun } from './jobs.mjs';
 import {
   listSportsbooks, saveSportsbook, createBet, updateBet, deleteBet, correctSettlement, listBets, getBet, bettingHistory,
+  setClosingOdds,
 } from './bets.mjs';
+import { performance } from './performance.mjs';
+import { bankroll, saveBankrollSettings, addLedgerEntry } from './bankroll.mjs';
+import { ask } from './ask.mjs';
+import { defaultQuestionParser } from './ai/questions.mjs';
 import {
   requestAnalysis, analysisForMatch, listPredictions, thresholdsFor, setThresholds, featureSnapshot,
 } from './analysis.mjs';
@@ -35,6 +40,7 @@ const HOST = process.env.HOST ?? '127.0.0.1';
 const FRONT_DOOR_URL = process.env.CONFORZA_URL ?? 'http://localhost:5177';
 
 const db = openDatabase(process.env.SOKKERLIGA_DB ?? undefined);
+const questionParser = defaultQuestionParser();
 
 const MIME = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8',
@@ -106,6 +112,9 @@ async function handleApi(req, res, url) {
     return result ? send(res, 200, result) : notFound(res, 'match');
   }
 
+  m = path.match(/^\/api\/matches\/(\d+)\/players$/);
+  if (m && method === 'GET') return send(res, 200, matchPlayers(db, m[1]));
+
   m = path.match(/^\/api\/matches\/(\d+)\/analysis$/);
   if (m && method === 'GET') return send(res, 200, analysisForMatch(db, m[1]));
   m = path.match(/^\/api\/matches\/(\d+)\/analyze$/);
@@ -147,7 +156,31 @@ async function handleApi(req, res, url) {
   }
   m = path.match(/^\/api\/bets\/(\d+)\/settlements$/);
   if (m && method === 'POST') return send(res, 200, correctSettlement(db, person.id, m[1], await readJson(req)));
+  m = path.match(/^\/api\/bets\/(\d+)\/legs\/(\d+)\/closing$/);
+  if (m && method === 'PUT') {
+    const body = await readJson(req);
+    return send(res, 200, setClosingOdds(db, person.id, m[1], m[2], body.closingOdds));
+  }
   if (path === '/api/history' && method === 'GET') return send(res, 200, bettingHistory(db, person.id, q));
+
+  /* Phase 4 and 5 */
+  if (path === '/api/performance' && method === 'GET') return send(res, 200, performance(db, q));
+  if (path === '/api/bankroll' && method === 'GET') return send(res, 200, bankroll(db, person.id));
+  if (path === '/api/bankroll/settings' && method === 'PUT') {
+    return send(res, 200, saveBankrollSettings(db, person.id, await readJson(req)));
+  }
+  if (path === '/api/bankroll/ledger' && method === 'POST') {
+    return send(res, 200, addLedgerEntry(db, person.id, await readJson(req)));
+  }
+  if (path === '/api/ask' && method === 'POST') {
+    const body = await readJson(req);
+    try {
+      return send(res, 200, await ask(db, person.id, body.question, questionParser));
+    } catch (error) {
+      if (error.status === 'failed' || error.status === 'refused') return send(res, 502, { error: error.message });
+      throw error;
+    }
+  }
 
   if (path === '/api/teams' && method === 'GET') return send(res, 200, listTeams(db, q));
   m = path.match(/^\/api\/teams\/(\d+)$/);
@@ -172,6 +205,9 @@ async function handleApi(req, res, url) {
   if (m && method === 'PATCH') {
     const body = await readJson(req);
     setCompetitionEnabled(db, m[1], !!body.isEnabled);
+    /* A competition switched on gets its season, teams, fixtures, table and
+     * squads on the worker's next pass, rather than over the next week. */
+    if (body.isEnabled) for (const job of ['sync_competitions', 'sync_teams', 'sync_fixtures', 'sync_standings', 'sync_squads']) requestRun(db, job);
     return send(res, 200, listCompetitions(db));
   }
 

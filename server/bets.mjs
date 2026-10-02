@@ -12,7 +12,7 @@
  */
 
 import { ValidationError, transaction } from './db.mjs';
-import { grade, matchFacts, settleBet } from './grading.mjs';
+import { grade, matchFacts, settleBet, playerOf } from './grading.mjs';
 import { parseOdds, parseMoney } from '../src/odds.js';
 import { selectionLabel } from '../src/markets.js';
 
@@ -56,7 +56,8 @@ function selectionId(db, matchId, market, line, selection) {
  * selection made before both the bet and kickoff. */
 function modelAtBet(db, selectionId, placedAt) {
   const p = db.prepare(`
-    SELECT p.id, p.model_probability, p.fair_odds, r.id AS rec_id, r.decision
+    SELECT p.id, COALESCE(p.calibrated_probability, p.model_probability) AS model_probability, p.fair_odds,
+           r.id AS rec_id, r.decision
     FROM predictions p JOIN matches m ON m.id = p.match_id
     LEFT JOIN recommendations r ON r.prediction_id = p.id
     WHERE p.selection_id = ? AND p.created_at <= ? AND p.created_at < m.kickoff_utc
@@ -87,7 +88,12 @@ function normaliseBet(db, input) {
   const out = legs.map((leg, i) => {
     const match = db.prepare('SELECT id, kickoff_utc FROM matches WHERE id = ?').get(Number(leg.matchId));
     if (!match) throw new ValidationError(`Selection ${i + 1}: that match does not exist.`);
-    if (!VALID_SELECTIONS[leg.market]?.includes(leg.selection)) {
+    if (leg.market === 'anytime_scorer') {
+      const pid = playerOf(leg.selection);
+      if (pid === null || !db.prepare('SELECT 1 FROM players WHERE id = ?').get(pid)) {
+        throw new ValidationError(`Selection ${i + 1}: choose the player.`);
+      }
+    } else if (!VALID_SELECTIONS[leg.market]?.includes(leg.selection)) {
       throw new ValidationError(`Selection ${i + 1}: "${leg.selection}" is not a valid choice for this market.`);
     }
     const odds = parseOdds(leg.odds);
@@ -303,7 +309,8 @@ function shapeBet(db, b) {
            m.kickoff_utc, m.status_key, m.home_goals, m.away_goals, ht.name AS home, at.name AS away,
            ht.logo_url AS home_logo, at.logo_url AS away_logo, c.name AS competition, se.competition_id,
            (SELECT outcome FROM settlements st WHERE st.bet_leg_id = l.id ORDER BY st.id DESC LIMIT 1) AS outcome,
-           p.confidence_band
+           p.confidence_band,
+           (SELECT name FROM players pl WHERE s.key LIKE 'p:%' AND pl.id = CAST(substr(s.key, 3) AS INTEGER)) AS player_name
     FROM bet_legs l JOIN selections s ON s.id = l.selection_id JOIN markets mk ON mk.id = s.market_id
     JOIN market_types mt ON mt.key = mk.market_type_key
     JOIN matches m ON m.id = l.match_id JOIN seasons se ON se.id = m.season_id JOIN competitions c ON c.id = se.competition_id
@@ -317,7 +324,7 @@ function shapeBet(db, b) {
     outcome: b.outcome ?? 'pending', profitMinor: b.profit_minor ?? null, settledBy: b.settled_by ?? null,
     legs: legs.map((l) => ({
       id: l.id, matchId: l.match_id, market: l.market, line: l.line, selection: l.selection, marketName: l.market_name,
-      label: selectionLabel(l.market, l.line, l.selection, l.home, l.away),
+      label: selectionLabel(l.market, l.line, l.selection, l.home, l.away, l.player_name), playerName: l.player_name,
       home: l.home, away: l.away, homeLogo: l.home_logo, awayLogo: l.away_logo, competition: l.competition,
       competitionId: l.competition_id,
       kickoffUtc: l.kickoff_utc, status: l.status_key,
@@ -330,6 +337,22 @@ function shapeBet(db, b) {
       outcome: l.outcome ?? 'pending',
     })),
   };
+}
+
+/** The price at kickoff, typed in by hand (there is no odds feed), for
+ *  closing-line value: did the price taken beat where the market closed? */
+export function setClosingOdds(db, userId, betId, legId, value) {
+  const leg = db.prepare(`SELECT l.id FROM bet_legs l JOIN bets b ON b.id = l.bet_id
+                          WHERE l.id = ? AND b.id = ? AND b.user_id = ? AND b.deleted_at IS NULL AND l.replaced_at IS NULL`)
+    .get(Number(legId), Number(betId), userId);
+  if (!leg) throw new ValidationError('That selection does not exist.', 404);
+  let decimal = null;
+  if (value !== null && value !== undefined && String(value).trim() !== '') {
+    decimal = parseOdds(value)?.decimal ?? null;
+    if (!decimal) throw new ValidationError(`"${value}" is not valid odds. Use 2.50, +150 or 6/4.`);
+  }
+  db.prepare('UPDATE bet_legs SET closing_odds = ? WHERE id = ?').run(decimal, leg.id);
+  return getBet(db, betId, userId);
 }
 
 export function getBet(db, id, userId) {
@@ -365,6 +388,7 @@ function tally(bets) {
   const staked = sum((b) => b.stakeMinor);
   const profit = sum((b) => b.profitMinor ?? 0);
   const edges = bets.flatMap((b) => b.legs.map((l) => l.edge)).filter((e) => e !== null);
+  const clv = bets.flatMap((b) => b.legs.map((l) => l.clv)).filter((c) => c !== null);
   return {
     bets: bets.length, settled: settled.length, open: bets.length - settled.length, won, lost, pushed,
     winRate: won + lost ? won / (won + lost) : null,
@@ -372,6 +396,8 @@ function tally(bets) {
     roi: staked ? profit / staked : null,
     averageOdds: bets.length ? bets.reduce((a, b) => a + b.totalOdds, 0) / bets.length : null,
     averageEdge: edges.length ? edges.reduce((a, e) => a + e, 0) / edges.length : null,
+    closing: { legs: clv.length, beat: clv.filter((c) => c > 0).length,
+      averageClv: clv.length ? clv.reduce((a, c) => a + c, 0) / clv.length : null },
   };
 }
 

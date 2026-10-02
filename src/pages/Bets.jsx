@@ -71,6 +71,7 @@ function BetCard({ bet, onChanged }) {
               ) : <span className="subtle">No analysis before this bet</span>}
               {bet.legs.length > 1 && <OutcomeBadge outcome={l.outcome} />}
             </div>
+            <ClosingPrice bet={bet} leg={l} onChanged={onChanged} />
           </div>
         ))}
       </div>
@@ -83,6 +84,41 @@ function BetCard({ bet, onChanged }) {
         <button className="link-button danger" onClick={remove}>Delete</button>
       </div>
       {correcting && <CorrectForm bet={bet} onDone={() => { setCorrecting(false); onChanged(); }} />}
+    </div>
+  );
+}
+
+/* The price at kickoff, typed in by hand (there is no odds feed). Beating
+ * it consistently is the best sign of judgement there is. */
+function ClosingPrice({ bet, leg, onChanged }) {
+  const [open, setOpen] = useState(false);
+  const [value, setValue] = useState(leg.closingOdds ? String(leg.closingOdds) : '');
+  const [error, setError] = useState(null);
+  const save = async (e) => {
+    e.preventDefault();
+    setError(null);
+    try { await api.setClosingOdds(bet.id, leg.id, value); setOpen(false); onChanged(); } catch (err) { setError(err.message); }
+  };
+  if (open) {
+    return (
+      <form className="closing-form" onSubmit={save}>
+        <label className="check">Closing price
+          <input value={value} inputMode="decimal" placeholder="e.g. 1.95" autoFocus onChange={(e) => setValue(e.target.value)} />
+        </label>
+        <button className="primary" type="submit">Save</button>
+        <button type="button" className="link-button" onClick={() => setOpen(false)}>Cancel</button>
+        {error && <span className="danger">{error}</span>}
+      </form>
+    );
+  }
+  return (
+    <div className="bet-figures">
+      {leg.closingOdds ? (
+        <span className={leg.clv > 0 ? 'profit-up' : 'profit-down'}>
+          Closed at {leg.closingOdds.toFixed(2)} · {leg.clv > 0 ? 'beat the close by' : 'behind the close by'} {Math.abs(leg.clv * 100).toFixed(1)}%
+        </span>
+      ) : null}
+      <button className="link-button" onClick={() => setOpen(true)}>{leg.closingOdds ? 'Change closing price' : 'Add closing price'}</button>
     </div>
   );
 }

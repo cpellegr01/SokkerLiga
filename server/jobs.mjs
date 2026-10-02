@@ -15,6 +15,8 @@ import {
   normaliseSquad, normalisePlayerProfile, normaliseInjury, SOURCE_KEY,
 } from './providers/api-football.mjs';
 import { gradePredictions, settleBets } from './bets.mjs';
+import { runBacktest } from './backtest.mjs';
+import { fitCalibrations, trainChallenger, snapshotPerformance } from './performance.mjs';
 import {
   importLeague, importTeams, importFixture, importFixtureDetails, importStandings,
   importSquad, importPlayerProfile, importInjuries, idFor,
@@ -33,6 +35,39 @@ const enabledCompetitions = (db) =>
 
 const currentSeason = (db, competitionId) =>
   db.prepare('SELECT * FROM seasons WHERE competition_id = ? AND is_current = 1').get(competitionId);
+
+/* ---------------------------------------------------------- quota plan */
+
+/** Requests left today as the provider last reported them; null if unknown. */
+export function quotaLeft(db, now = new Date()) {
+  const row = db.prepare('SELECT * FROM provider_quota WHERE source_key = ? AND day = ?').get(SOURCE_KEY, now.toISOString().slice(0, 10));
+  if (!row) return null;
+  if (row.remaining !== null && row.remaining !== undefined) return row.remaining;
+  return row.daily_limit ? row.daily_limit - row.requests_used : null;
+}
+
+const reserve = (db) => Number(getSetting(db, 'quota_reserve')) || 750;
+
+/**
+ * Whether a job should wait for tomorrow's quota. Essential jobs (results,
+ * fixtures, grading) always run; normal ones wait below the reserve;
+ * deferrable ones (squads, profiles, backfill) wait below twice the reserve,
+ * so a heavy day never starves results and lineups.
+ */
+export function quotaHold(db, priority, now = new Date()) {
+  if (priority === 'essential') return null;
+  const left = quotaLeft(db, now);
+  if (left === null) return null;
+  const keep = reserve(db) * (priority === 'deferrable' ? 2 : 1);
+  if (left >= keep) return null;
+  return `Waiting for tomorrow's quota: ${left} requests left today, ${keep} kept for results and lineups.`;
+}
+
+const nextUtcDay = (now = new Date()) => {
+  const d = new Date(now);
+  d.setUTCHours(24, 10, 0, 0);
+  return d.toISOString();
+};
 
 /* Run one unit of work; record its error and carry on. */
 async function step(ctx, label, fn) {
@@ -130,9 +165,11 @@ export const JOBS = {
         OR (kickoff_utc BETWEEN ? AND ? AND status_key = 'scheduled')
       )
       ORDER BY kickoff_utc`).all(SOURCE_KEY, iso(-8 * 60), iso(0), iso(0), iso(75));
-    /* 20 batches of 20 a run: a few hundred requests an hour while history
-     * fills in, then nothing once the backlog is empty. */
-    const backlogBatches = 20;
+    /* Up to 20 batches of 20 a run: a few hundred requests an hour while
+     * history fills in, then nothing once the backlog is empty — and never
+     * into the requests kept back for results and lineups. */
+    const left = quotaLeft(db);
+    const backlogBatches = left === null ? 20 : Math.max(0, Math.min(20, left - reserve(db)));
     const backlog = db.prepare(`
       SELECT id, source_ref FROM matches
       WHERE source_key = ? AND ${enabled} AND details_fetched_at IS NULL
@@ -145,13 +182,22 @@ export const JOBS = {
     ctx.message = `${urgent.length} current and ${rows.length - urgent.length} past matches checked.`;
   },
 
+  /* Only competitions with a result since the last check: a table does not
+   * change between matchdays, so the request would be wasted. */
   async sync_standings(ctx) {
     const { db, provider } = ctx;
+    const lastCheck = db.prepare(`SELECT started_at FROM job_runs WHERE job_key = 'sync_standings' AND status IN ('ok', 'partial')
+                                  ORDER BY id DESC LIMIT 1`).get()?.started_at;
+    const since = lastCheck ? new Date(Date.parse(lastCheck) - 3 * 3600_000).toISOString() : null;
+    const played = db.prepare(`SELECT 1 FROM matches WHERE season_id = ? AND kickoff_utc BETWEEN ? AND ? LIMIT 1`);
+    let skipped = 0;
     for (const c of enabledCompetitions(db)) {
       const season = currentSeason(db, c.id);
       if (!season) continue;
+      if (since && !played.get(season.id, since, new Date().toISOString())) { skipped += 1; continue; }
       await step(ctx, c.name, () => importSeasonStandings(ctx, c, season, provider));
     }
+    if (skipped) ctx.message = `${skipped} competition${skipped === 1 ? '' : 's'} skipped: no match since the last check.`;
   },
 
   async sync_squads(ctx) {
@@ -199,12 +245,17 @@ export const JOBS = {
     ctx.message = players.length ? `${players.length} players profiled.` : 'Every known player has a profile.';
   },
 
+  /* Only competitions with a match in the next four days. */
   async sync_injuries(ctx) {
     const { db, provider } = ctx;
+    const now = Date.now();
+    const soon = db.prepare(`SELECT 1 FROM matches WHERE season_id = ? AND status_key = 'scheduled' AND kickoff_utc BETWEEN ? AND ? LIMIT 1`);
+    let skipped = 0;
     for (const c of enabledCompetitions(db)) {
       const season = currentSeason(db, c.id);
       const coverage = JSON.parse(season?.coverage_json ?? '{}');
       if (!season || coverage.injuries === false) continue;
+      if (!soon.get(season.id, new Date(now).toISOString(), new Date(now + 4 * 86400_000).toISOString())) { skipped += 1; continue; }
       await step(ctx, c.name, async () => {
         const { items, fetchedAt } = await provider.injuries(c.api_football_id, season.year);
         ctx.recordsIn += items.length;
@@ -213,6 +264,27 @@ export const JOBS = {
         });
       });
     }
+    if (skipped) ctx.message = `${skipped} competition${skipped === 1 ? '' : 's'} skipped: no match in the next four days.`;
+  },
+
+  /* Phase 4: no provider requests. */
+  async backtest_model(ctx) {
+    const r = await runBacktest(ctx.db);
+    ctx.recordsIn = r.matches;
+    ctx.recordsWritten = r.selections;
+    ctx.message = r.matches || r.remaining
+      ? `${r.matches} past matches priced over ${r.days} match days; ${r.remaining.toLocaleString()} still to do.`
+      : 'Backtest up to date.';
+  },
+
+  async calibrate_and_train(ctx) {
+    const { db } = ctx;
+    const fits = fitCalibrations(db);
+    const learned = trainChallenger(db);
+    const snaps = snapshotPerformance(db);
+    ctx.recordsWritten = fits.length + (learned.trained ? 1 : 0) + snaps;
+    ctx.message = `${fits.length} market${fits.length === 1 ? '' : 's'} calibrated (${fits.filter((f) => f.applied).length} applied); `
+      + (learned.trained ? `challenger ${learned.version} trained` : learned.reason);
   },
 
   /* Grade predictions and settle recorded bets from confirmed results. No
@@ -287,6 +359,15 @@ export async function runJob(db, key, { providerFactory } = {}) {
 
   const runId = Number(db.prepare('INSERT INTO job_runs (job_key, source_key, started_at) VALUES (?, ?, ?)')
     .run(key, SOURCE_KEY, startedAt).lastInsertRowid);
+
+  /* Low on requests: a scheduled run of a non-essential job waits for
+   * tomorrow. "Run now" still runs it. */
+  const hold = job.run_requested_at ? null : quotaHold(db, job.quota_priority);
+  if (hold) {
+    db.prepare(`UPDATE job_runs SET finished_at = ?, status = 'skipped', message = ? WHERE id = ?`).run(new Date().toISOString(), hold, runId);
+    db.prepare('UPDATE jobs SET locked_until = NULL, next_run_at = ? WHERE key = ?').run(nextUtcDay(), key);
+    return db.prepare('SELECT * FROM job_runs WHERE id = ?').get(runId);
+  }
   /* The provider is built on first use, so a job that never calls it (the
    * grading job) runs even without a key. */
   let provider = null;
@@ -354,12 +435,13 @@ export function syncStatus(db) {
   const quota = db.prepare('SELECT * FROM provider_quota WHERE source_key = ? ORDER BY day DESC LIMIT 1').get(SOURCE_KEY);
   return {
     providerConfigured: !!process.env.API_FOOTBALL_KEY,
+    quotaReserve: reserve(db),
     explainerConfigured: !!process.env.ANTHROPIC_API_KEY,
     quota: quota ?? null,
     jobs: jobs.map((j) => {
       const run = last.get(j.key);
       return {
-        key: j.key, name: j.name, description: j.description, intervalMinutes: j.interval_minutes,
+        key: j.key, name: j.name, description: j.description, intervalMinutes: j.interval_minutes, quotaPriority: j.quota_priority,
         isEnabled: !!j.is_enabled, nextRunAt: j.next_run_at, running: !!(j.locked_until && j.locked_until > new Date().toISOString()),
         runRequested: !!j.run_requested_at,
         lastSuccessAt: lastOk.get(j.key)?.finished_at ?? null,

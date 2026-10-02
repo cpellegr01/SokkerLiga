@@ -44,7 +44,8 @@ export function BetSlipProvider({ children }) {
         editingId: bet.id, stake: (bet.stakeMinor / 100).toFixed(2), sportsbook: bet.sportsbook.key,
         placedAt: toLocalInput(bet.placedAt), totalOdds: bet.totalOddsText ?? '', notes: bet.notes ?? '',
         legs: bet.legs.map((l) => ({ matchId: l.matchId, home: l.home, away: l.away, kickoffUtc: l.kickoffUtc,
-          market: l.market, line: l.line, selection: l.selection, odds: l.oddsText, fairOdds: l.fairOdds })),
+          market: l.market, line: l.line, selection: l.selection, playerName: l.playerName, odds: l.oddsText,
+          fairOdds: l.fairOdds, closingOdds: l.closingOdds ?? '' })),
       });
       setOpen(true);
     },
@@ -76,8 +77,10 @@ function SlipDrawer() {
   const [error, setError] = useState(null);
   const [saving, setSaving] = useState(false);
   const [adding, setAdding] = useState(draft.legs.length === 0);
+  const [bankrolls, setBankrolls] = useState([]);
 
   useEffect(() => { api.listSportsbooks().then(setBooks).catch((e) => setError(e.message)); }, []);
+  useEffect(() => { api.getBankroll().then((b) => setBankrolls(b.bankrolls)).catch(() => setBankrolls([])); }, []);
   useEffect(() => {
     const onKey = (e) => { if (e.key === 'Escape') setOpen(false); };
     window.addEventListener('keydown', onKey);
@@ -100,6 +103,11 @@ function SlipDrawer() {
   const total = draft.totalOdds ? parseOdds(draft.totalOdds)?.decimal ?? null : product;
   const stakeMinor = parseMoney(draft.stake);
   const payout = total && stakeMinor ? Math.round(stakeMinor * total) : null;
+  /* The bankroll plan for this app's currency, if one is set up. When
+   * editing, this bet's own stake is already counted as open. */
+  const plan = bankrolls.find((b) => b.currency === currency) ?? null;
+  const limitMinor = plan ? Math.floor((plan.balanceMinor * plan.settings.maxExposurePct) / 100) : null;
+  const overLimit = plan && stakeMinor && !draft.editingId && plan.exposureMinor + stakeMinor > limitMinor;
 
   const save = async () => {
     setError(null);
@@ -107,7 +115,8 @@ function SlipDrawer() {
     const body = {
       sportsbook: draft.sportsbook, stake: draft.stake, totalOdds: draft.legs.length > 1 ? draft.totalOdds : '',
       placedAt: draft.placedAt ? new Date(draft.placedAt).toISOString() : undefined, notes: draft.notes,
-      legs: draft.legs.map((l) => ({ matchId: l.matchId, market: l.market, line: l.line, selection: l.selection, odds: l.odds })),
+      legs: draft.legs.map((l) => ({ matchId: l.matchId, market: l.market, line: l.line, selection: l.selection, odds: l.odds,
+        closingOdds: l.closingOdds || undefined })),
     };
     try {
       if (draft.editingId) await api.updateBet(draft.editingId, { ...body, reason: 'Edited from the bet slip' });
@@ -140,7 +149,7 @@ function SlipDrawer() {
               <div key={`${l.matchId}-${l.market}-${l.line}-${l.selection}`} className="slip-leg">
                 <div className="slip-leg-head">
                   <div>
-                    <div>{selectionLabel(l.market, l.line, l.selection, l.home, l.away)}</div>
+                    <div>{selectionLabel(l.market, l.line, l.selection, l.home, l.away, l.playerName)}</div>
                     <div className="subtle">{l.home} v {l.away}{l.kickoffUtc ? ` · ${kickoff(l.kickoffUtc)}` : ''}</div>
                   </div>
                   <button className="link-button danger" onClick={() => removeLeg(i)}>Remove</button>
@@ -166,6 +175,20 @@ function SlipDrawer() {
               <div className="slip-row">
                 <label className="slip-field">Stake ({currency})
                   <input value={draft.stake} inputMode="decimal" placeholder="10.00" onChange={(e) => set({ stake: e.target.value })} />
+                  {plan && !draft.editingId && (
+                    <span className="suggested subtle">
+                      Your plan suggests {formatMoney(plan.suggestedStakeMinor, currency)}
+                      {plan.suggestedStakeMinor > 0 && (
+                        <button type="button" className="link-button" onClick={() => set({ stake: (plan.suggestedStakeMinor / 100).toFixed(2) })}>Use it</button>
+                      )}
+                    </span>
+                  )}
+                  {overLimit && (
+                    <span className="danger">
+                      With this bet, {formatMoney(plan.exposureMinor + stakeMinor, currency)} would ride on open bets — over your
+                      {' '}{plan.settings.maxExposurePct}% limit of {formatMoney(limitMinor, currency)}.
+                    </span>
+                  )}
                 </label>
                 <label className="slip-field">Betting app
                   {books && books.length ? (
@@ -248,6 +271,7 @@ function AddSelection({ onAdd, onCancel }) {
   const [market, setMarket] = useState('match_result');
   const [line, setLine] = useState('');
   const [selection, setSelection] = useState('home');
+  const [squads, setSquads] = useState(null);
 
   useEffect(() => {
     const from = new Date(Date.now() - 2 * 86400_000).toISOString();
@@ -256,9 +280,17 @@ function AddSelection({ onAdd, onCancel }) {
   }, []);
   const opt = MARKET_OPTIONS.find((m) => m.key === market);
   useEffect(() => {
-    setSelection(opt.selections[0]);
+    setSelection(opt.selections[0] ?? '');
     setLine(opt.line ? String(opt.defaultLine) : '');
   }, [market]); // eslint-disable-line react-hooks/exhaustive-deps
+  /* Player markets: both squads, top scorers first. */
+  useEffect(() => {
+    if (!opt.player || !match) return;
+    setSquads(null);
+    api.matchPlayers(match.id).then(setSquads).catch(() => setSquads({ home: { players: [] }, away: { players: [] } }));
+  }, [opt.player, match]);
+  const players = squads ? [...squads.home.players, ...squads.away.players] : [];
+  const playerName = opt.player ? players.find((p) => `p:${p.id}` === selection)?.name ?? null : null;
 
   const shown = (matches ?? []).filter((m) => !q || `${m.home.name} ${m.away.name} ${m.competition.name}`.toLowerCase().includes(q.toLowerCase())).slice(0, 30);
   return (
@@ -294,17 +326,34 @@ function AddSelection({ onAdd, onCancel }) {
                 <input value={line} inputMode="decimal" onChange={(e) => setLine(e.target.value)} />
               </label>
             )}
-            <label className="slip-field">Selection
-              <select value={selection} onChange={(e) => setSelection(e.target.value)}>
-                {opt.selections.map((s) => (
-                  <option key={s} value={s}>{selectionLabel(market, opt.line ? Number(line) : null, s, match.home.name, match.away.name)}</option>
-                ))}
-              </select>
-            </label>
+            {opt.player ? (
+              <label className="slip-field">Player
+                {squads === null ? <span className="subtle">Loading the squads…</span> : (
+                  <select value={selection} onChange={(e) => setSelection(e.target.value)}>
+                    <option value="">Choose a player</option>
+                    {[['home', squads.home], ['away', squads.away]].map(([side, team]) => (
+                      <optgroup key={side} label={team.name ?? (side === 'home' ? match.home.name : match.away.name)}>
+                        {team.players.map((p) => (
+                          <option key={p.id} value={`p:${p.id}`}>{p.name}{p.goals ? ` (${p.goals} goals this year)` : ''}</option>
+                        ))}
+                      </optgroup>
+                    ))}
+                  </select>
+                )}
+              </label>
+            ) : (
+              <label className="slip-field">Selection
+                <select value={selection} onChange={(e) => setSelection(e.target.value)}>
+                  {opt.selections.map((s) => (
+                    <option key={s} value={s}>{selectionLabel(market, opt.line ? Number(line) : null, s, match.home.name, match.away.name)}</option>
+                  ))}
+                </select>
+              </label>
+            )}
           </div>
-          <button className="primary" disabled={opt.line && !Number.isFinite(Number(line))}
+          <button className="primary" disabled={(opt.line && !Number.isFinite(Number(line))) || !selection}
             onClick={() => onAdd({ matchId: match.id, home: match.home.name, away: match.away.name, kickoffUtc: match.kickoffUtc,
-              market, line: opt.line ? Number(line) : null, selection })}>
+              market, line: opt.line ? Number(line) : null, selection, playerName })}>
             Add to slip
           </button>
         </>

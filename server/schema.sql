@@ -402,7 +402,8 @@ CREATE TABLE IF NOT EXISTS jobs (
   next_run_at      TEXT,
   locked_until     TEXT,
   run_requested_at TEXT,                  -- "Run now" from Settings
-  ordinal          INTEGER NOT NULL
+  ordinal          INTEGER NOT NULL,
+  quota_priority   TEXT NOT NULL DEFAULT 'normal'  -- essential / normal / deferrable: what waits when requests run low
 );
 
 CREATE TABLE IF NOT EXISTS job_runs (
@@ -527,7 +528,8 @@ CREATE TABLE IF NOT EXISTS analysis_runs (
   input_tokens        INTEGER,
   output_tokens       INTEGER,
   cost_cents          REAL,
-  error               TEXT
+  error               TEXT,
+  calibration_json    TEXT              -- Phase 4: the calibration fits applied, by market
 );
 CREATE INDEX IF NOT EXISTS analysis_runs_match_idx ON analysis_runs(match_id, requested_at);
 CREATE INDEX IF NOT EXISTS analysis_runs_status_idx ON analysis_runs(status);
@@ -758,3 +760,177 @@ BEGIN SELECT RAISE(ABORT, 'Bet history cannot be deleted.'); END;
 -- Bets are soft-deleted (deleted_at); the row itself stays.
 CREATE TRIGGER IF NOT EXISTS bets_no_delete BEFORE DELETE ON bets
 BEGIN SELECT RAISE(ABORT, 'Bets are never deleted; they are marked deleted.'); END;
+
+-- =================================================================
+-- Phase 4: backtest, model performance, calibration.
+-- Design: docs/architecture.md §3 "Calibration" and §9.
+--
+-- The backtest re-runs the statistical model for past matches as of an hour
+-- before each match day, through the same buildFeatures() the live analysis
+-- uses, so it can only see what was knowable then. Its rows are not
+-- predictions (those cannot be made after kickoff); they are the evidence
+-- for performance and for calibration.
+-- =================================================================
+
+CREATE TABLE IF NOT EXISTS backtest_matches (
+  match_id      INTEGER NOT NULL REFERENCES matches(id),
+  model_key     TEXT NOT NULL,
+  model_version TEXT NOT NULL,
+  as_of         TEXT NOT NULL,
+  status        TEXT NOT NULL CHECK (status IN ('priced', 'skipped')),
+  reason        TEXT,
+  inputs_json   TEXT,                 -- the learned model's inputs, as of as_of
+  created_at    TEXT NOT NULL,
+  PRIMARY KEY (match_id, model_key, model_version)
+);
+
+CREATE TABLE IF NOT EXISTS backtest_predictions (
+  id              INTEGER PRIMARY KEY,
+  match_id        INTEGER NOT NULL REFERENCES matches(id),
+  model_key       TEXT NOT NULL,
+  model_version   TEXT NOT NULL,
+  market          TEXT NOT NULL REFERENCES market_types(key),
+  line            REAL,
+  selection       TEXT NOT NULL,
+  probability     REAL NOT NULL,
+  confidence_band TEXT NOT NULL,
+  outcome         TEXT                -- graded from the confirmed result; NULL when the facts were missing
+);
+CREATE INDEX IF NOT EXISTS backtest_predictions_match_idx ON backtest_predictions(match_id);
+CREATE INDEX IF NOT EXISTS backtest_predictions_market_idx ON backtest_predictions(market, model_key, model_version);
+
+-- Isotonic calibration per market, refitted nightly. Dated rows: an analysis
+-- uses the latest fit made before it, and records which.
+CREATE TABLE IF NOT EXISTS calibrations (
+  id             INTEGER PRIMARY KEY,
+  model_key      TEXT NOT NULL,
+  model_version  TEXT NOT NULL,
+  market         TEXT NOT NULL REFERENCES market_types(key),
+  fitted_at      TEXT NOT NULL,
+  n              REAL NOT NULL,       -- graded selections it was fitted on
+  knots_json     TEXT NOT NULL,       -- [[raw, calibrated], ...] increasing
+  holdout_n      REAL NOT NULL,       -- the newest 20%, kept out of the trial fit
+  raw_log_loss   REAL, cal_log_loss REAL,
+  raw_brier      REAL, cal_brier    REAL,
+  raw_ece        REAL, cal_ece      REAL,
+  applied        INTEGER NOT NULL     -- 1 only when it improved the holdout
+);
+CREATE INDEX IF NOT EXISTS calibrations_latest_idx ON calibrations(model_key, model_version, market, fitted_at);
+
+-- Dated snapshots of headline performance, so drift over time can be read back.
+CREATE TABLE IF NOT EXISTS model_performance (
+  id            INTEGER PRIMARY KEY,
+  model_key     TEXT NOT NULL,
+  model_version TEXT NOT NULL,
+  computed_at   TEXT NOT NULL,
+  source        TEXT NOT NULL,        -- live / backtest
+  segment_json  TEXT NOT NULL,        -- {"market": "over_under"} ...
+  n             REAL NOT NULL,
+  brier         REAL, log_loss REAL, naive_brier REAL, ece REAL
+);
+
+-- A learned challenger: multinomial logistic regression for the match
+-- result, trained nightly on the backtest's inputs. It runs in the shadow:
+-- its views are logged and scored, never used for recommendations.
+CREATE TABLE IF NOT EXISTS learned_models (
+  id               INTEGER PRIMARY KEY,
+  model_key        TEXT NOT NULL,
+  version          TEXT NOT NULL,
+  trained_at       TEXT NOT NULL,
+  n_train          INTEGER NOT NULL,
+  n_test           INTEGER NOT NULL,
+  test_log_loss    REAL NOT NULL,
+  baseline_log_loss REAL NOT NULL,    -- Dixon–Coles on the same held-out matches
+  test_brier       REAL NOT NULL,
+  baseline_brier   REAL NOT NULL,
+  weights_json     TEXT NOT NULL,
+  inputs_json      TEXT NOT NULL,     -- input names, in order
+  UNIQUE (model_key, version)
+);
+
+CREATE TABLE IF NOT EXISTS challenger_predictions (
+  id              INTEGER PRIMARY KEY,
+  analysis_run_id INTEGER NOT NULL REFERENCES analysis_runs(id),
+  match_id        INTEGER NOT NULL REFERENCES matches(id),
+  model_key       TEXT NOT NULL,
+  model_version   TEXT NOT NULL,
+  selection       TEXT NOT NULL,      -- home / draw / away
+  probability     REAL NOT NULL,
+  created_at      TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS challenger_predictions_match_idx ON challenger_predictions(match_id);
+
+CREATE TRIGGER IF NOT EXISTS backtest_predictions_immutable BEFORE UPDATE ON backtest_predictions
+BEGIN SELECT RAISE(ABORT, 'Backtest rows cannot be changed.'); END;
+CREATE TRIGGER IF NOT EXISTS calibrations_immutable BEFORE UPDATE ON calibrations
+BEGIN SELECT RAISE(ABORT, 'Calibrations cannot be changed; a refit is a new row.'); END;
+CREATE TRIGGER IF NOT EXISTS calibrations_no_delete BEFORE DELETE ON calibrations
+BEGIN SELECT RAISE(ABORT, 'Calibrations cannot be deleted.'); END;
+CREATE TRIGGER IF NOT EXISTS learned_models_immutable BEFORE UPDATE ON learned_models
+BEGIN SELECT RAISE(ABORT, 'A trained model cannot be changed; retraining makes a new version.'); END;
+CREATE TRIGGER IF NOT EXISTS challenger_predictions_immutable BEFORE UPDATE ON challenger_predictions
+BEGIN SELECT RAISE(ABORT, 'Challenger predictions cannot be changed.'); END;
+CREATE TRIGGER IF NOT EXISTS challenger_predictions_no_late_insert
+BEFORE INSERT ON challenger_predictions
+WHEN (SELECT kickoff_utc FROM matches WHERE id = NEW.match_id) <= NEW.created_at
+BEGIN SELECT RAISE(ABORT, 'Predictions cannot be made after kickoff.'); END;
+
+-- Every graded selection, live and backtest, in one shape: y is 1 for a
+-- win, w halves the weight of a half-won or half-lost quarter line.
+-- Versioned by name: a changed definition is a new view, never a rewrite.
+CREATE VIEW IF NOT EXISTS scored_predictions_v1 AS
+SELECT 'backtest' AS source, b.match_id, m.kickoff_utc, se.competition_id, b.market, b.line, b.selection,
+       b.model_key, b.model_version, b.confidence_band, b.probability AS p_raw, b.probability AS p,
+       m.home_team_id, m.away_team_id,
+       CASE WHEN b.outcome IN ('won', 'half_won') THEN 1 ELSE 0 END AS y,
+       CASE WHEN b.outcome IN ('half_won', 'half_lost') THEN 0.5 ELSE 1 END AS w
+FROM backtest_predictions b JOIN matches m ON m.id = b.match_id JOIN seasons se ON se.id = m.season_id
+WHERE b.outcome IN ('won', 'lost', 'half_won', 'half_lost')
+UNION ALL
+SELECT 'live', p.match_id, m.kickoff_utc, se.competition_id, mk.market_type_key, mk.line, s.key,
+       r.prob_model_key, r.prob_model_version, p.confidence_band, p.model_probability,
+       COALESCE(p.calibrated_probability, p.model_probability),
+       m.home_team_id, m.away_team_id,
+       CASE WHEN g.outcome IN ('won', 'half_won') THEN 1 ELSE 0 END,
+       CASE WHEN g.outcome IN ('half_won', 'half_lost') THEN 0.5 ELSE 1 END
+FROM predictions p
+JOIN analysis_runs r ON r.id = p.analysis_run_id
+JOIN selections s ON s.id = p.selection_id JOIN markets mk ON mk.id = s.market_id
+JOIN matches m ON m.id = p.match_id JOIN seasons se ON se.id = m.season_id
+JOIN prediction_grades g ON g.id = (SELECT MAX(id) FROM prediction_grades WHERE prediction_id = p.id)
+WHERE p.superseded_by IS NULL AND g.outcome IN ('won', 'lost', 'half_won', 'half_lost');
+
+-- =================================================================
+-- Phase 5: bankroll tools.
+-- Optional. One bankroll per currency. Settings are dated rows; the ledger
+-- is append-only (a mistake is corrected with an opposite entry).
+-- =================================================================
+
+CREATE TABLE IF NOT EXISTS bankroll_settings (
+  id               INTEGER PRIMARY KEY,
+  user_id          TEXT NOT NULL,
+  currency         TEXT NOT NULL,
+  starting_minor   INTEGER NOT NULL CHECK (starting_minor >= 0),
+  started_at       TEXT NOT NULL,     -- bets placed before this do not count
+  method           TEXT NOT NULL CHECK (method IN ('flat', 'percent', 'unit')),
+  amount           REAL NOT NULL,     -- flat: cents; percent: % of balance; unit: cents per unit
+  max_exposure_pct REAL NOT NULL DEFAULT 25,
+  effective_from   TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS bankroll_settings_user_idx ON bankroll_settings(user_id, currency, effective_from);
+
+CREATE TABLE IF NOT EXISTS bankroll_ledger (
+  id           INTEGER PRIMARY KEY,
+  user_id      TEXT NOT NULL,
+  currency     TEXT NOT NULL,
+  kind         TEXT NOT NULL CHECK (kind IN ('deposit', 'withdrawal')),
+  amount_minor INTEGER NOT NULL CHECK (amount_minor > 0),
+  at           TEXT NOT NULL,
+  note         TEXT,
+  created_at   TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS bankroll_ledger_user_idx ON bankroll_ledger(user_id, currency, at);
+CREATE TRIGGER IF NOT EXISTS bankroll_ledger_immutable BEFORE UPDATE ON bankroll_ledger
+BEGIN SELECT RAISE(ABORT, 'Ledger entries cannot be changed; add a correcting entry.'); END;
+CREATE TRIGGER IF NOT EXISTS bankroll_ledger_no_delete BEFORE DELETE ON bankroll_ledger
+BEGIN SELECT RAISE(ABORT, 'Ledger entries cannot be deleted; add a correcting entry.'); END;
