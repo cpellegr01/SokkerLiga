@@ -19,7 +19,10 @@ describe('Odds as typed', () => {
     assert.equal(parseOdds('150').format, 'american');
     assert.equal(parseOdds('6/4').decimal, 2.5);
     assert.equal(parseOdds('evens').decimal, 2);
-    for (const bad of ['', '1', '0.9', '+50', 'abc', '3/0']) assert.equal(parseOdds(bad), null, bad);
+    assert.deepEqual(parseOdds('68%'), { decimal: 1.4706, format: 'percent', text: '68%' });
+    assert.equal(parseOdds('68¢').decimal, 1.4706);
+    assert.equal(parseOdds('68/100').decimal, 1.68, 'a fraction, not a percentage');
+    for (const bad of ['', '1', '0.9', '+50', 'abc', '3/0', '0%', '100%']) assert.equal(parseOdds(bad), null, bad);
   });
 
   test('converting back for display, and money in cents', () => {

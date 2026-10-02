@@ -155,11 +155,14 @@ function SlipDrawer() {
                   <button className="link-button danger" onClick={() => removeLeg(i)}>Remove</button>
                 </div>
                 <label className="slip-field">Odds taken
-                  <input value={l.odds} inputMode="decimal" placeholder="2.50, +150 or 6/4" autoFocus={!l.odds && i === draft.legs.length - 1}
+                  <input value={l.odds} inputMode="decimal" placeholder="2.50, +150, 6/4 or 68%" autoFocus={!l.odds && i === draft.legs.length - 1}
                     onChange={(e) => setLeg(i, { odds: e.target.value })} />
+                  <span className="subtle">Type the price exactly as your app shows it: decimal (2.50), American (+150), fractional (6/4),
+                    or a percentage or cents (68% or 68¢).</span>
                 </label>
                 {l.odds && (p
-                  ? <span className="subtle">{describeOdds(p.decimal)}{l.fairOdds ? <ValueNote odds={p.decimal} fair={l.fairOdds} /> : null}</span>
+                  ? <span className="subtle">Read as {describeOdds(p.decimal)}: every {formatMoney(100, currency)} staked pays back {formatMoney(Math.round(p.decimal * 100), currency)} if it wins
+                    {l.fairOdds ? <ValueNote odds={p.decimal} fair={l.fairOdds} /> : null}</span>
                   : <span className="danger">Not valid odds yet</span>)}
               </div>
             );
@@ -175,6 +178,8 @@ function SlipDrawer() {
               <div className="slip-row">
                 <label className="slip-field">Stake ({currency})
                   <input value={draft.stake} inputMode="decimal" placeholder="10.00" onChange={(e) => set({ stake: e.target.value })} />
+                  <span className="subtle">The amount you put on the bet — what you lose if it loses.</span>
+                  {payout && <span className="subtle">If it wins you get {formatMoney(payout, currency)} back: your {formatMoney(stakeMinor, currency)} plus {formatMoney(payout - stakeMinor, currency)} profit.</span>}
                   {plan && !draft.editingId && (
                     <span className="suggested subtle">
                       Your plan suggests {formatMoney(plan.suggestedStakeMinor, currency)}

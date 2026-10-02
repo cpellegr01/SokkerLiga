@@ -7,13 +7,22 @@
  *   decimal     2.5, 2,50, 1.91
  *   American    +150, -110, 150 (a whole number ≥ 100 with no sign is read as American)
  *   fractional  6/4, 11/10, evens, evs
- * @returns {{ decimal: number, format: 'decimal'|'american'|'fractional', text: string } | null}
+ *   percent     68%, 68¢, 68c — the price as a chance or as cents per $1
+ *               paid out (prediction-market apps); 68% pays 1 / 0.68 = 1.47
+ * @returns {{ decimal: number, format: 'decimal'|'american'|'fractional'|'percent', text: string } | null}
  */
 export function parseOdds(input) {
   const text = String(input ?? '').trim();
   if (!text) return null;
   const t = text.toLowerCase().replace(/\s+/g, '');
   if (t === 'evens' || t === 'evs' || t === 'even') return { decimal: 2, format: 'fractional', text };
+
+  const percent = t.match(/^(\d+(?:[.,]\d+)?)(%|¢|c)$/);
+  if (percent) {
+    const v = Number(percent[1].replace(',', '.'));
+    if (!(v > 0 && v < 100)) return null;
+    return { decimal: round(100 / v), format: 'percent', text };
+  }
 
   const frac = t.match(/^(\d+(?:\.\d+)?)\/(\d+(?:\.\d+)?)$/);
   if (frac) {
@@ -58,9 +67,9 @@ export function toFractional(decimal) {
   return `${best[0]}/${best[1]}`;
 }
 
-/** "2.50 (+150, 6/4)" — the other two formats, for checking a typed price. */
+/** "2.50 · +150 · 6/4 · 40%" — every format, for checking a typed price. */
 export function describeOdds(decimal) {
-  return `${decimal.toFixed(2)} · ${toAmerican(decimal)} · ${toFractional(decimal)}`;
+  return `${decimal.toFixed(2)} · ${toAmerican(decimal)} · ${toFractional(decimal)} · ${Math.round(100 / decimal)}%`;
 }
 
 /** Implied probability of decimal odds (bookmaker margin included). */

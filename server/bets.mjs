@@ -97,7 +97,7 @@ function normaliseBet(db, input) {
       throw new ValidationError(`Selection ${i + 1}: "${leg.selection}" is not a valid choice for this market.`);
     }
     const odds = parseOdds(leg.odds);
-    if (!odds) throw new ValidationError(`Selection ${i + 1}: odds "${leg.odds ?? ''}" are not valid. Use 2.50, +150 or 6/4.`);
+    if (!odds) throw new ValidationError(`Selection ${i + 1}: odds "${leg.odds ?? ''}" are not valid. Use 2.50, +150, 6/4 or 68%.`);
     const selId = selectionId(db, match.id, leg.market, leg.line, leg.selection);
     if (seen.has(selId)) throw new ValidationError('The same selection is in the bet twice.');
     seen.add(selId);
