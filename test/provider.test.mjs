@@ -137,7 +137,8 @@ describe('The API-Football client', () => {
     const db = openDatabase(':memory:');
     const client = createClient({ db, apiKey: 'k', minIntervalMs: 0, fetchImpl: async () =>
       response(envelope('fixtures', [], { errors: { plan: 'Free plans do not have access to this season.' } })) });
-    await assert.rejects(() => client.fixtures(39, 2026), (e) => e instanceof ProviderError && /Free plans/.test(e.message));
+    await assert.rejects(() => client.fixtures(39, 2026),
+      (e) => e instanceof ProviderError && /Free plans/.test(e.message) && e.fatal === true);
   });
 
   test('a refused key is reported plainly', async () => {

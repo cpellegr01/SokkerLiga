@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { openDatabase } from '../server/db.mjs';
 import { runJob, dueJobs, requestRun, syncStatus, retryFailedNow } from '../server/jobs.mjs';
 import { fakeProvider, fixture } from './fixtures/api-football.mjs';
+import { ProviderError } from '../server/providers/api-football.mjs';
 
 let db;
 beforeEach(() => {
@@ -74,6 +75,21 @@ describe('Data-refresh jobs', () => {
     assert.equal(dueJobs(db).includes('sync_competitions'), false);
     assert.equal(retryFailedNow(db), 1);
     assert.equal(dueJobs(db).includes('sync_competitions'), true);
+  });
+
+  test('a plan refusal stops the job at the first competition and waits six hours', async () => {
+    db.prepare("UPDATE competitions SET is_enabled = 1 WHERE key IN ('premier-league', 'la-liga')").run();
+    const opts0 = { providerFactory: () => fakeProvider() };
+    await runJob(db, 'sync_competitions', opts0);
+    const provider = fakeProvider({ teams: () => {
+      throw new ProviderError('API-Football: Free plans do not have access to this season.', { fatal: true });
+    } });
+    const run = await runJob(db, 'sync_teams', { providerFactory: () => provider });
+    assert.equal(run.status, 'failed');
+    assert.equal(provider.calls.filter((c) => c[0] === 'teams').length, 1, 'La Liga is not asked');
+    assert.equal(JSON.parse(run.errors_json).length, 1);
+    const next = Date.parse(db.prepare("SELECT next_run_at FROM jobs WHERE key = 'sync_teams'").get().next_run_at);
+    assert.ok(next > Date.now() + 5 * 3600_000 && next <= Date.now() + 6 * 3600_000 + 1000);
   });
 
   test('one failing competition does not stop the others', async () => {

@@ -24,10 +24,13 @@ const MIN_INTERVAL_MS = 250;
 const MAX_ATTEMPTS = 3;
 
 export class ProviderError extends Error {
-  constructor(message, { status = null, retryable = false } = {}) {
+  /* fatal: no point trying the next item — the key, the plan or the day's
+   * quota rules it out for every request. */
+  constructor(message, { status = null, retryable = false, fatal = false } = {}) {
     super(message);
     this.status = status;
     this.retryable = retryable;
+    this.fatal = fatal;
   }
 }
 
@@ -101,7 +104,7 @@ export function createClient({ db, apiKey, fetchImpl = fetch, now = () => new Da
       throw new ProviderError(`API-Football answered ${res.status}.`, { status: res.status, retryable: true });
     }
     if (res.status === 401 || res.status === 403) {
-      throw new ProviderError('API-Football refused the key. Check API_FOOTBALL_KEY.', { status: res.status });
+      throw new ProviderError('API-Football refused the key. Check API_FOOTBALL_KEY.', { status: res.status, fatal: true });
     }
     if (!res.ok) throw new ProviderError(`API-Football answered ${res.status}.`, { status: res.status });
 
@@ -116,7 +119,11 @@ export function createClient({ db, apiKey, fetchImpl = fetch, now = () => new Da
       const message = Object.values(errors).join(' ');
       /* "Too many requests" arrives as an error object with HTTP 200. */
       const retryable = /too many requests|rate ?limit/i.test(message);
-      throw new ProviderError(`API-Football: ${message}`, { retryable });
+      /* "Free plans do not have access to this season", a bad token, a
+       * suspended account: every other request would be refused the same. */
+      const fatal = !retryable && (errors.plan !== undefined || errors.token !== undefined
+        || errors.requests !== undefined || /plan|subscription|token|suspend/i.test(message));
+      throw new ProviderError(`API-Football: ${message}`, { retryable, fatal });
     }
     return { body, fetchedAt };
   }
@@ -124,7 +131,7 @@ export function createClient({ db, apiKey, fetchImpl = fetch, now = () => new Da
   async function request(endpoint, params = {}) {
     const remaining = remainingToday();
     if (remaining !== null && remaining <= 0) {
-      throw new ProviderError('The API-Football daily quota is used up; waiting for tomorrow.');
+      throw new ProviderError('The API-Football daily quota is used up; waiting for tomorrow.', { fatal: true });
     }
     for (let attempt = 1; ; attempt += 1) {
       try {

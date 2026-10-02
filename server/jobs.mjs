@@ -21,6 +21,9 @@ import {
 
 const LOCK_MINUTES = 60;
 const RETRY_FAILED_MINUTES = 15;
+/* Refused by the plan, the key or the quota: those don't change by
+ * themselves within minutes. A worker restart retries at once. */
+const RETRY_BLOCKED_MINUTES = 360;
 
 /* ------------------------------------------------------------- helpers */
 
@@ -36,7 +39,12 @@ async function step(ctx, label, fn) {
     return await fn();
   } catch (error) {
     ctx.errors.push(`${label}: ${error.message}`);
-    if (/quota is used up|refused the key|No API-Football key/.test(error.message)) throw error;
+    /* The key, the plan or the quota rules out every other item too: stop
+     * now instead of spending a request per competition to hear it again. */
+    if (error.fatal || /No API-Football key/.test(error.message)) {
+      ctx.fatal = true;
+      throw error;
+    }
     return null;
   }
 }
@@ -274,12 +282,13 @@ export async function runJob(db, key, { providerFactory } = {}) {
     if (ctx.errors.length) status = ctx.recordsWritten || ctx.recordsIn ? 'partial' : 'failed';
   } catch (error) {
     status = 'failed';
-    ctx.errors.push(error.message);
+    if (!ctx.errors.length || !ctx.errors[ctx.errors.length - 1].endsWith(error.message)) ctx.errors.push(error.message);
   } finally {
     const finishedAt = new Date().toISOString();
     /* A failed job tries again soon rather than waiting out its interval —
      * for the weekly competitions job that would be a week. */
-    const minutes = status === 'failed' ? Math.min(job.interval_minutes, RETRY_FAILED_MINUTES) : job.interval_minutes;
+    const retry = ctx.fatal ? RETRY_BLOCKED_MINUTES : RETRY_FAILED_MINUTES;
+    const minutes = status === 'failed' ? Math.min(job.interval_minutes, retry) : job.interval_minutes;
     const nextRun = minutes > 0 ? new Date(Date.now() + minutes * 60_000).toISOString() : null;
     db.prepare(`UPDATE job_runs SET finished_at = ?, status = ?, records_in = ?, records_written = ?,
                   requests_used = ?, message = ?, errors_json = ? WHERE id = ?`)
