@@ -19,6 +19,9 @@ import {
 } from './queries.mjs';
 import { syncStatus, requestRun } from './jobs.mjs';
 import {
+  listSportsbooks, saveSportsbook, createBet, updateBet, deleteBet, correctSettlement, listBets, getBet, bettingHistory,
+} from './bets.mjs';
+import {
   requestAnalysis, analysisForMatch, listPredictions, thresholdsFor, setThresholds, featureSnapshot,
 } from './analysis.mjs';
 import { VERSION } from '../src/version.js';
@@ -123,6 +126,28 @@ async function handleApi(req, res, url) {
   if (path === '/api/market-types' && method === 'GET') {
     return send(res, 200, db.prepare('SELECT key, name, family, description FROM market_types ORDER BY ordinal').all());
   }
+
+  /* Betting apps, bets, settlement and history. */
+  if (path === '/api/sportsbooks' && method === 'GET') return send(res, 200, listSportsbooks(db));
+  if (path === '/api/sportsbooks' && method === 'POST') return send(res, 200, saveSportsbook(db, await readJson(req)));
+  m = path.match(/^\/api\/sportsbooks\/([a-z0-9-]+)$/);
+  if (m && method === 'PUT') return send(res, 200, saveSportsbook(db, { ...(await readJson(req)), key: m[1] }));
+
+  if (path === '/api/bets' && method === 'GET') return send(res, 200, listBets(db, person.id, q));
+  if (path === '/api/bets' && method === 'POST') return send(res, 201, createBet(db, person.id, await readJson(req)));
+  m = path.match(/^\/api\/bets\/(\d+)$/);
+  if (m && method === 'GET') {
+    const bet = getBet(db, m[1], person.id);
+    return bet ? send(res, 200, bet) : notFound(res, 'bet');
+  }
+  if (m && method === 'PUT') return send(res, 200, updateBet(db, person.id, m[1], await readJson(req)));
+  if (m && method === 'DELETE') {
+    deleteBet(db, person.id, m[1]);
+    return send(res, 200, { ok: true });
+  }
+  m = path.match(/^\/api\/bets\/(\d+)\/settlements$/);
+  if (m && method === 'POST') return send(res, 200, correctSettlement(db, person.id, m[1], await readJson(req)));
+  if (path === '/api/history' && method === 'GET') return send(res, 200, bettingHistory(db, person.id, q));
 
   if (path === '/api/teams' && method === 'GET') return send(res, 200, listTeams(db, q));
   m = path.match(/^\/api\/teams\/(\d+)$/);

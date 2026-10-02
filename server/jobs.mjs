@@ -14,6 +14,7 @@ import {
   createClient, normaliseLeague, normaliseTeam, normaliseFixture, normaliseStandings,
   normaliseSquad, normalisePlayerProfile, normaliseInjury, SOURCE_KEY,
 } from './providers/api-football.mjs';
+import { gradePredictions, settleBets } from './bets.mjs';
 import {
   importLeague, importTeams, importFixture, importFixtureDetails, importStandings,
   importSquad, importPlayerProfile, importInjuries, idFor,
@@ -214,6 +215,16 @@ export const JOBS = {
     }
   },
 
+  /* Grade predictions and settle recorded bets from confirmed results. No
+   * provider calls: it reads what the results job already stored. */
+  async grade_and_settle(ctx) {
+    const { db } = ctx;
+    const graded = gradePredictions(db);
+    const settled = settleBets(db);
+    ctx.recordsWritten = graded + settled;
+    ctx.message = `${graded} prediction grade${graded === 1 ? '' : 's'} and ${settled} settlement row${settled === 1 ? '' : 's'} written.`;
+  },
+
   /* Earlier seasons: fixture lists and final tables. Their match details
    * then arrive through sync_results' backlog, a few batches per run, so a
    * backfill never eats the daily quota in one go. */
@@ -276,10 +287,15 @@ export async function runJob(db, key, { providerFactory } = {}) {
 
   const runId = Number(db.prepare('INSERT INTO job_runs (job_key, source_key, started_at) VALUES (?, ?, ?)')
     .run(key, SOURCE_KEY, startedAt).lastInsertRowid);
-  const ctx = { db, recordsIn: 0, recordsWritten: 0, errors: [], message: null, provider: null };
+  /* The provider is built on first use, so a job that never calls it (the
+   * grading job) runs even without a key. */
+  let provider = null;
+  const ctx = {
+    db, recordsIn: 0, recordsWritten: 0, errors: [], message: null,
+    get provider() { provider ??= (providerFactory ?? defaultProvider)(db); return provider; },
+  };
   let status = 'ok';
   try {
-    ctx.provider = (providerFactory ?? defaultProvider)(db);
     await JOBS[key](ctx);
     if (ctx.errors.length) status = ctx.recordsWritten || ctx.recordsIn ? 'partial' : 'failed';
   } catch (error) {
@@ -294,7 +310,7 @@ export async function runJob(db, key, { providerFactory } = {}) {
     const nextRun = minutes > 0 ? new Date(Date.now() + minutes * 60_000).toISOString() : null;
     db.prepare(`UPDATE job_runs SET finished_at = ?, status = ?, records_in = ?, records_written = ?,
                   requests_used = ?, message = ?, errors_json = ? WHERE id = ?`)
-      .run(finishedAt, status, ctx.recordsIn, ctx.recordsWritten, ctx.provider?.requestsUsed ?? 0,
+      .run(finishedAt, status, ctx.recordsIn, ctx.recordsWritten, provider?.requestsUsed ?? 0,
         ctx.message ?? ctx.errors[0] ?? null, JSON.stringify(ctx.errors.slice(0, 50)), runId);
     db.prepare('UPDATE jobs SET locked_until = NULL, next_run_at = ?, run_requested_at = NULL WHERE key = ?')
       .run(nextRun, key);

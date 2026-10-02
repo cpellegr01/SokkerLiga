@@ -3,7 +3,7 @@ import * as api from '../api.js';
 import { href } from '../router.js';
 import { kickoff } from '../format.js';
 import { CONFIDENCE_LABEL } from '../markets.js';
-import { useApi, Page, Loading, ErrorBanner, Empty, Crest, StanceBadge, DecisionBadge } from '../components/ui.jsx';
+import { useApi, Page, Loading, ErrorBanner, Empty, Crest, StanceBadge, DecisionBadge, OutcomeBadge } from '../components/ui.jsx';
 
 export default function Predictions() {
   const [decision, setDecision] = useState('recommend');
@@ -62,7 +62,7 @@ export default function Predictions() {
                     <td className="hide-sm">{CONFIDENCE_LABEL[p.confidence]}</td>
                     <td title={p.passReasons.join('\n')}><DecisionBadge decision={p.decision} reasons={p.passReasons} /></td>
                     <td className="hide-sm"><StanceBadge stance={p.aiStance} /></td>
-                    <td className="hide-sm">{p.homeGoals !== null && p.status === 'finished' ? `${p.homeGoals}–${p.awayGoals}` : '—'}</td>
+                    <td className="hide-sm">{p.grade ? <><OutcomeBadge outcome={p.grade} /> <span className="subtle">{p.homeGoals}–{p.awayGoals}</span></> : '—'}</td>
                   </tr>
                 ))}
               </tbody>
@@ -70,7 +70,6 @@ export default function Predictions() {
           </div>
         </div>
       ) : <Empty>No predictions match. Open a match and use <strong>Analyse match</strong> on its Analysis tab.</Empty>}
-      <p className="subtle">Whether each prediction came in is graded from the result in Phase 3.</p>
     </Page>
   );
 }

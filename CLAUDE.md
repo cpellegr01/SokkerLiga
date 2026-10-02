@@ -56,6 +56,27 @@ data can reference people by id.
   fair odds 1.30–2.50 (the minimum keeps near-certainties out).
 - `src/markets.js` — selection labels, shared by server and UI.
 
+## Code map (Phase 3 — bets and grading)
+
+- `server/grading.mjs` — `grade(market, line, selection, facts)`, one rule
+  set for predictions AND bet legs (regular time; whole lines push; quarter
+  AH lines → half_won/half_lost; postponed → void after 48 h; awarded →
+  void). `settleBet` does singles and parlays (void legs drop out; a quoted
+  parlay total is honoured).
+- `server/bets.mjs` — bets recorded by hand after placing them elsewhere.
+  At record time each leg freezes the model's latest prediction made before
+  both the bet and kickoff (p, fair odds, edge = p − 1/odds, EV). Edits write
+  `bet_revisions` and mark old legs `replaced_at` (never deleted); deletes
+  are soft. Settlement rows and prediction grades are append-only; a manual
+  correction wins over automatic settlement.
+- Job `grade_and_settle` (every 15 min) grades predictions and settles bets
+  from confirmed results; it needs no provider key.
+- `src/odds.js` — parse decimal / American / fractional (shared with the
+  server); money in integer cents; amounts in different currencies are
+  never summed (per betting app currency).
+- UI: `src/components/BetSlip.jsx` (drawer; full-screen on phones; draft
+  kept in localStorage), `pages/Bets.jsx`, `pages/History.jsx`.
+
 Deviations from `docs/architecture.md`, deliberately small: no `stages`
 table (round text on matches, group name on standings); logos/photos are
 columns rather than an `images` table; `ingest.mjs`/`jobs.mjs` are single

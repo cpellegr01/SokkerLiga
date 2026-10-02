@@ -290,7 +290,8 @@ const PREDICTION_SELECT = `
          p.fair_odds AS fairOdds, p.confidence_score AS confidenceScore, p.confidence_band AS confidence,
          p.created_at AS createdAt, p.superseded_by AS supersededBy,
          mk.market_type_key AS market, mk.line, s.key AS selection, mt.name AS marketName, mt.family, mt.ordinal,
-         r.decision, r.pass_reasons_json, r.ai_stance AS aiStance
+         r.decision, r.pass_reasons_json, r.ai_stance AS aiStance,
+         (SELECT g.outcome FROM prediction_grades g WHERE g.prediction_id = p.id ORDER BY g.id DESC LIMIT 1) AS grade
   FROM predictions p
   JOIN selections s ON s.id = p.selection_id JOIN markets mk ON mk.id = s.market_id
   JOIN market_types mt ON mt.key = mk.market_type_key

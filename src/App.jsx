@@ -12,6 +12,9 @@ import League from './pages/League.jsx';
 import Settings from './pages/Settings.jsx';
 import Later from './pages/Later.jsx';
 import Predictions from './pages/Predictions.jsx';
+import Bets from './pages/Bets.jsx';
+import History from './pages/History.jsx';
+import { BetSlipProvider } from './components/BetSlip.jsx';
 import { Teams, Players, Leagues } from './pages/Lists.jsx';
 
 const NAV = [
@@ -45,6 +48,7 @@ export default function App() {
   const props = { id: route.id, params: route.params, me, onFavourite };
 
   return (
+    <BetSlipProvider>
     <div className="shell">
       <header className="topbar">
         <button className="menu-button" aria-label="Menu" aria-expanded={menuOpen} onClick={() => setMenuOpen((o) => !o)}>☰</button>
@@ -67,6 +71,7 @@ export default function App() {
         </main>
       </div>
     </div>
+    </BetSlipProvider>
   );
 }
 
@@ -83,7 +88,9 @@ function Routed({ page, props }) {
     case 'league': return <League key={props.id} {...props} />;
     case 'settings': return <Settings {...props} />;
     case 'predictions': return <Predictions {...props} />;
-    case 'bets': case 'history': case 'performance': return <Later page={page} />;
+    case 'bets': return <Bets {...props} />;
+    case 'history': return <History {...props} />;
+    case 'performance': return <Later page={page} />;
     default: return <Dashboard {...props} />;
   }
 }

@@ -649,3 +649,112 @@ BEGIN
 END;
 CREATE TRIGGER IF NOT EXISTS analysis_runs_no_delete BEFORE DELETE ON analysis_runs
 BEGIN SELECT RAISE(ABORT, 'Analysis runs cannot be deleted.'); END;
+
+-- =================================================================
+-- Phase 3: grading, bets recorded by hand, settlement.
+-- Design: docs/architecture.md §7. Bets are placed in Claudio's betting
+-- app and recorded here afterwards; SokkerLiga never places a bet.
+-- Grades and settlements are append-only: a correction is a new row and the
+-- latest row is the current one.
+-- =================================================================
+
+-- How each prediction turned out.
+CREATE TABLE IF NOT EXISTS prediction_grades (
+  id            INTEGER PRIMARY KEY,
+  prediction_id INTEGER NOT NULL REFERENCES predictions(id),
+  outcome       TEXT NOT NULL CHECK (outcome IN ('won', 'lost', 'push', 'void', 'half_won', 'half_lost')),
+  source        TEXT NOT NULL DEFAULT 'auto' CHECK (source IN ('auto', 'manual')),
+  reason        TEXT,
+  graded_at     TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS prediction_grades_prediction_idx ON prediction_grades(prediction_id, id);
+
+-- The betting apps Claudio uses. Amounts are kept in each app's currency.
+CREATE TABLE IF NOT EXISTS sportsbooks (
+  key        TEXT PRIMARY KEY,
+  name       TEXT NOT NULL,
+  currency   TEXT NOT NULL DEFAULT 'USD',
+  is_active  INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS bets (
+  id                     INTEGER PRIMARY KEY,
+  user_id                TEXT NOT NULL,
+  placed_at              TEXT NOT NULL,          -- when it was placed in the betting app
+  sportsbook_key         TEXT NOT NULL REFERENCES sportsbooks(key),
+  kind                   TEXT NOT NULL CHECK (kind IN ('single', 'parlay')),
+  stake_minor            INTEGER NOT NULL CHECK (stake_minor > 0),   -- cents
+  currency               TEXT NOT NULL,
+  total_odds             REAL NOT NULL CHECK (total_odds > 1),
+  total_odds_text        TEXT,                   -- as typed, when the app quoted its own total
+  potential_payout_minor INTEGER NOT NULL,
+  notes                  TEXT,
+  created_at             TEXT NOT NULL,
+  updated_at             TEXT NOT NULL,
+  deleted_at             TEXT
+);
+CREATE INDEX IF NOT EXISTS bets_user_idx ON bets(user_id, placed_at);
+
+CREATE TABLE IF NOT EXISTS bet_legs (
+  id                       INTEGER PRIMARY KEY,
+  bet_id                   INTEGER NOT NULL REFERENCES bets(id),
+  ordinal                  INTEGER NOT NULL,
+  match_id                 INTEGER NOT NULL REFERENCES matches(id),
+  selection_id             INTEGER NOT NULL REFERENCES selections(id),
+  odds_taken               REAL NOT NULL CHECK (odds_taken > 1),   -- decimal
+  odds_text                TEXT NOT NULL,                          -- exactly as typed
+  odds_format              TEXT NOT NULL,                          -- decimal / american / fractional
+  -- Frozen at the moment the bet is recorded, from the model's latest
+  -- prediction made before both the bet and kickoff. Never recomputed.
+  prediction_id            INTEGER REFERENCES predictions(id),
+  recommendation_id        INTEGER REFERENCES recommendations(id),
+  model_probability_at_bet REAL,
+  fair_odds_at_bet         REAL,
+  edge_at_bet              REAL,     -- model probability − 1 / odds taken
+  ev_at_bet                REAL,     -- expected profit per unit staked
+  followed_recommendation  INTEGER,  -- 1 when the model said Recommend for this selection
+  closing_odds             REAL,     -- typed in by hand when known (no odds feed)
+  replaced_at              TEXT      -- set when an edit replaced this leg; kept for history
+);
+CREATE INDEX IF NOT EXISTS bet_legs_match_idx ON bet_legs(match_id);
+CREATE INDEX IF NOT EXISTS bet_legs_bet_idx ON bet_legs(bet_id, replaced_at);
+
+-- Edits keep the previous version of the bet and its legs.
+CREATE TABLE IF NOT EXISTS bet_revisions (
+  id         INTEGER PRIMARY KEY,
+  bet_id     INTEGER NOT NULL REFERENCES bets(id),
+  changed_at TEXT NOT NULL,
+  reason     TEXT NOT NULL,
+  old_json   TEXT NOT NULL
+);
+
+-- Settlement history. bet_leg_id NULL = the whole bet. The latest row for a
+-- bet (or leg) is its current settlement.
+CREATE TABLE IF NOT EXISTS settlements (
+  id           INTEGER PRIMARY KEY,
+  bet_id       INTEGER NOT NULL REFERENCES bets(id),
+  bet_leg_id   INTEGER REFERENCES bet_legs(id),
+  outcome      TEXT NOT NULL CHECK (outcome IN ('pending', 'won', 'lost', 'push', 'void', 'half_won', 'half_lost')),
+  source       TEXT NOT NULL CHECK (source IN ('auto', 'manual')),
+  reason       TEXT,
+  profit_minor INTEGER,              -- whole bet only; NULL for legs and pending
+  settled_at   TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS settlements_bet_idx ON settlements(bet_id, id);
+
+CREATE TRIGGER IF NOT EXISTS prediction_grades_immutable BEFORE UPDATE ON prediction_grades
+BEGIN SELECT RAISE(ABORT, 'Grades cannot be changed; add a correction instead.'); END;
+CREATE TRIGGER IF NOT EXISTS prediction_grades_no_delete BEFORE DELETE ON prediction_grades
+BEGIN SELECT RAISE(ABORT, 'Grades cannot be deleted.'); END;
+CREATE TRIGGER IF NOT EXISTS settlements_immutable BEFORE UPDATE ON settlements
+BEGIN SELECT RAISE(ABORT, 'Settlements cannot be changed; add a correction instead.'); END;
+CREATE TRIGGER IF NOT EXISTS settlements_no_delete BEFORE DELETE ON settlements
+BEGIN SELECT RAISE(ABORT, 'Settlements cannot be deleted.'); END;
+CREATE TRIGGER IF NOT EXISTS bet_revisions_immutable BEFORE UPDATE ON bet_revisions
+BEGIN SELECT RAISE(ABORT, 'Bet history cannot be changed.'); END;
+CREATE TRIGGER IF NOT EXISTS bet_revisions_no_delete BEFORE DELETE ON bet_revisions
+BEGIN SELECT RAISE(ABORT, 'Bet history cannot be deleted.'); END;
+-- Bets are soft-deleted (deleted_at); the row itself stays.
+CREATE TRIGGER IF NOT EXISTS bets_no_delete BEFORE DELETE ON bets
+BEGIN SELECT RAISE(ABORT, 'Bets are never deleted; they are marked deleted.'); END;

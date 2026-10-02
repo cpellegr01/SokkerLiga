@@ -3,7 +3,8 @@ import * as api from '../api.js';
 import { href } from '../router.js';
 import { longDate, ago } from '../format.js';
 import { CONFIDENCE_LABEL } from '../markets.js';
-import { useApi, Loading, ErrorBanner, StanceBadge, DecisionBadge } from '../components/ui.jsx';
+import { useApi, Loading, ErrorBanner, StanceBadge, DecisionBadge, OutcomeBadge } from '../components/ui.jsx';
+import { useSlip } from '../components/BetSlip.jsx';
 
 const pct = (p) => `${(p * 100).toFixed(1)}%`;
 
@@ -62,8 +63,8 @@ export default function Analysis({ match }) {
           <FailedRun runs={data.runs.filter((r) => r.requested_at > latest.run.requested_at)} />
           <ModelView latest={latest} match={match} />
           <Explanation latest={latest} />
-          <TopPicks predictions={latest.predictions} />
-          <AllMarkets predictions={latest.predictions} />
+          <TopPicks predictions={latest.predictions} match={match} />
+          <AllMarkets predictions={latest.predictions} match={match} />
         </>
       )}
     </div>
@@ -164,7 +165,8 @@ function Explanation({ latest }) {
 const FAVOURS = { home: 'Home', away: 'Away', more_goals: 'More goals', fewer_goals: 'Fewer goals', neutral: 'Neutral' };
 
 /* The strongest recommendation in each market. */
-function TopPicks({ predictions }) {
+function TopPicks({ predictions, match }) {
+  const slip = useSlip();
   const best = new Map();
   for (const p of predictions.filter((x) => x.decision === 'recommend')) {
     const cur = best.get(p.market);
@@ -191,6 +193,9 @@ function TopPicks({ predictions }) {
               <StanceBadge stance={p.aiStance} prefix="Claude: " />
             </div>
             <Factors factors={p.factors} />
+            <div className="bet-actions">
+              {p.grade ? <OutcomeBadge outcome={p.grade} /> : <button onClick={() => slip.add(legFrom(p, match))}>I bet this</button>}
+            </div>
           </div>
         ))}
       </div>
@@ -210,7 +215,9 @@ function Factors({ factors }) {
   );
 }
 
-function AllMarkets({ predictions }) {
+function AllMarkets({ predictions, match }) {
+  const slip = useSlip();
+  const started = Date.parse(match.kickoffUtc) <= Date.now();
   const [open, setOpen] = useState(false);
   const groups = new Map();
   for (const p of predictions) {
@@ -227,7 +234,7 @@ function AllMarkets({ predictions }) {
         <div className="table-wrap">
           <table className="data">
             <thead><tr><th>Selection</th><th className="num">Probability</th><th className="num">Fair odds</th>
-              <th>Confidence</th><th>Decision</th><th className="hide-sm">Claude</th></tr></thead>
+              <th>Confidence</th><th>Decision</th><th className="hide-sm">Claude</th><th>{started ? 'Result' : ''}</th></tr></thead>
             <tbody>
               {[...groups].map(([name, rows]) => [
                 <tr key={name} className="group-row"><td colSpan={6}>{name}</td></tr>,
@@ -241,6 +248,8 @@ function AllMarkets({ predictions }) {
                       <DecisionBadge decision={p.decision} reasons={p.passReasons} />
                     </td>
                     <td className="hide-sm"><StanceBadge stance={p.aiStance} /></td>
+                    <td>{p.grade ? <OutcomeBadge outcome={p.grade} />
+                      : <button className="link-button" onClick={() => slip.add(legFrom(p, match))}>I bet this</button>}</td>
                   </tr>
                 )),
               ])}
@@ -251,3 +260,10 @@ function AllMarkets({ predictions }) {
     </div>
   );
 }
+
+/* A slip leg prefilled from a prediction, carrying the model's fair odds
+ * so the slip can show whether the price taken beats it. */
+const legFrom = (p, match) => ({
+  matchId: match.id, home: match.home.name, away: match.away.name, kickoffUtc: match.kickoffUtc,
+  market: p.market, line: p.line, selection: p.selection, fairOdds: p.fairOdds,
+});

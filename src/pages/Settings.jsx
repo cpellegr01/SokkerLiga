@@ -87,6 +87,8 @@ export default function Settings() {
 
       <Thresholds />
 
+      <BettingApps />
+
       <h2>Competitions</h2>
       <p className="subtle">Switched-off competitions are not refreshed and are hidden from match lists. Their history is kept.</p>
       <ErrorBanner error={comps.error} />
@@ -165,6 +167,39 @@ function Thresholds() {
         </fieldset>
         <div><button className="primary" type="submit">Save thresholds</button>{saved && <span className="subtle"> Saved.</span>}</div>
       </form>
+    </>
+  );
+}
+
+function BettingApps() {
+  const { data, error, reload } = useApi(() => api.listSportsbooks(), []);
+  const [name, setName] = useState('');
+  const [currency, setCurrency] = useState('USD');
+  const [err, setErr] = useState(null);
+  const save = async (book) => {
+    setErr(null);
+    try { await api.saveSportsbook(book); reload(); } catch (e) { setErr(e.message); }
+  };
+  return (
+    <>
+      <h2>Betting apps</h2>
+      <p className="subtle">The apps you bet with. Each bet is kept in its app's currency; amounts in different currencies are never added together.</p>
+      <ErrorBanner error={error ?? err} />
+      <div className="card">
+        {(data ?? []).map((b) => (
+          <div key={b.key} className="setting-row">
+            <span>{b.name} <span className="subtle">{b.currency}</span></span>
+            <label className="check">
+              <input type="checkbox" checked={b.isActive} onChange={() => save({ ...b, isActive: !b.isActive })} /> In use
+            </label>
+          </div>
+        ))}
+        <form className="setting-row" onSubmit={(e) => { e.preventDefault(); save({ name, currency }).then(() => setName('')); }}>
+          <input placeholder="Add a betting app, e.g. DraftKings" value={name} onChange={(e) => setName(e.target.value)} />
+          <input aria-label="Currency" value={currency} maxLength={3} size={4} onChange={(e) => setCurrency(e.target.value.toUpperCase())} />
+          <button type="submit" disabled={!name.trim()}>Add</button>
+        </form>
+      </div>
     </>
   );
 }

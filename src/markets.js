@@ -35,3 +35,22 @@ export function selectionLabel(market, line, selection, home, away) {
 
 export const CONFIDENCE_LABEL = { low: 'Low', medium: 'Medium', high: 'High' };
 export const STANCE_LABEL = { support: 'Supports', caution: 'Cautious', oppose: 'Disagrees' };
+
+/* For the bet slip: every market, whether it has a line, and its choices. */
+export const MARKET_OPTIONS = [
+  { key: 'match_result', name: 'Match result (1X2)', line: false, selections: ['home', 'draw', 'away'] },
+  { key: 'double_chance', name: 'Double chance', line: false, selections: ['home_draw', 'home_away', 'draw_away'] },
+  { key: 'draw_no_bet', name: 'Draw no bet', line: false, selections: ['home', 'away'] },
+  { key: 'over_under', name: 'Over/Under goals', line: true, defaultLine: 2.5, selections: ['over', 'under'] },
+  { key: 'btts', name: 'Both teams to score', line: false, selections: ['yes', 'no'] },
+  { key: 'asian_handicap', name: 'Asian handicap (line for the home team)', line: true, defaultLine: -0.5, selections: ['home', 'away'] },
+  { key: 'european_handicap', name: 'European handicap (line for the home team)', line: true, defaultLine: -1, selections: ['home', 'draw', 'away'] },
+  { key: 'home_total', name: 'Home team total goals', line: true, defaultLine: 1.5, selections: ['over', 'under'] },
+  { key: 'away_total', name: 'Away team total goals', line: true, defaultLine: 1.5, selections: ['over', 'under'] },
+  { key: 'corners_ou', name: 'Total corners', line: true, defaultLine: 9.5, selections: ['over', 'under'] },
+  { key: 'cards_ou', name: 'Total cards', line: true, defaultLine: 4.5, selections: ['over', 'under'] },
+];
+
+export const OUTCOME_LABEL = {
+  pending: 'Open', won: 'Won', lost: 'Lost', push: 'Push', void: 'Void', half_won: 'Half won', half_lost: 'Half lost',
+};

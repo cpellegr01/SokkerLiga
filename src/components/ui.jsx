@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { href } from '../router.js';
 import { kickoffTime, kickoffDay, STATUS_LABEL } from '../format.js';
-import { STANCE_LABEL } from '../markets.js';
+import { STANCE_LABEL, OUTCOME_LABEL } from '../markets.js';
 
 /* ----------------------------------------------------------- data hook */
 
@@ -235,9 +235,23 @@ export function StanceBadge({ stance, prefix = '' }) {
 }
 
 /** Recommend (green) or Pass (red); a Pass explains itself on hover. */
-export function DecisionBadge({ decision, reasons = [] }) {
+export function DecisionBadge({ decision, reasons = [], prefix = '' }) {
   if (!decision) return null;
   return decision === 'recommend'
-    ? <span className="pill decision-recommend">Recommend</span>
-    : <span className="pill decision-pass" title={reasons.join('\n')}>Pass</span>;
+    ? <span className="pill decision-recommend">{prefix}Recommend</span>
+    : <span className="pill decision-pass" title={reasons.join('\n')}>{prefix}Pass</span>;
+}
+
+/** How a bet or prediction turned out: green won, red lost, yellow push/void, grey open. */
+export function OutcomeBadge({ outcome }) {
+  if (!outcome) return null;
+  const tone = { won: 'good', half_won: 'good', lost: 'bad', half_lost: 'bad', push: 'mixed', void: 'mixed' }[outcome] ?? 'open';
+  return <span className={`pill outcome-${tone}`}>{OUTCOME_LABEL[outcome] ?? outcome}</span>;
+}
+
+/** Money with a sign and colour: green profit, red loss. */
+export function Profit({ minor, currency, format }) {
+  if (minor === null || minor === undefined) return <span className="subtle">—</span>;
+  const cls = minor > 0 ? 'profit-up' : minor < 0 ? 'profit-down' : '';
+  return <span className={cls}>{minor > 0 ? '+' : ''}{format(minor, currency)}</span>;
 }

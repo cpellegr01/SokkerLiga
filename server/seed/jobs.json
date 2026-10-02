@@ -1,11 +1,72 @@
 [
-  { "key": "sync_competitions", "name": "Competitions and seasons", "interval_minutes": 10080, "ordinal": 1, "description": "Which seasons exist and what the provider covers for each." },
-  { "key": "sync_teams",        "name": "Teams and venues",         "interval_minutes": 1440,  "ordinal": 2, "description": "Teams taking part in each enabled competition this season." },
-  { "key": "sync_fixtures",     "name": "Fixtures",                 "interval_minutes": 360,   "ordinal": 3, "description": "The full fixture list and kickoff changes for the current season." },
-  { "key": "sync_results",      "name": "Results and match details","interval_minutes": 15,    "ordinal": 4, "description": "Scores, events, lineups and statistics for matches that are live, just finished, or about to start." },
-  { "key": "sync_standings",    "name": "League tables",            "interval_minutes": 360,   "ordinal": 5, "description": "A dated snapshot of each competition's table." },
-  { "key": "sync_squads",       "name": "Squads",                   "interval_minutes": 1440,  "ordinal": 6, "description": "Each team's current squad; players leaving or joining are recorded with dates." },
-  { "key": "sync_players",      "name": "Player profiles",          "interval_minutes": 60,    "ordinal": 7, "description": "Birth date, nationality and height for players not yet profiled, a batch at a time." },
-  { "key": "sync_injuries",     "name": "Injuries and suspensions", "interval_minutes": 360,   "ordinal": 8, "description": "Players reported missing or doubtful for upcoming matches." },
-  { "key": "backfill_history",  "name": "Past seasons",             "interval_minutes": 0,     "ordinal": 9, "description": "Fixtures and match details for earlier seasons. Run by hand; paced to stay inside the daily quota." }
+  {
+    "key": "sync_competitions",
+    "name": "Competitions and seasons",
+    "interval_minutes": 10080,
+    "ordinal": 1,
+    "description": "Which seasons exist and what the provider covers for each."
+  },
+  {
+    "key": "sync_teams",
+    "name": "Teams and venues",
+    "interval_minutes": 1440,
+    "ordinal": 2,
+    "description": "Teams taking part in each enabled competition this season."
+  },
+  {
+    "key": "sync_fixtures",
+    "name": "Fixtures",
+    "interval_minutes": 360,
+    "ordinal": 3,
+    "description": "The full fixture list and kickoff changes for the current season."
+  },
+  {
+    "key": "sync_results",
+    "name": "Results and match details",
+    "interval_minutes": 15,
+    "ordinal": 4,
+    "description": "Scores, events, lineups and statistics for matches that are live, just finished, or about to start."
+  },
+  {
+    "key": "grade_and_settle",
+    "name": "Grading and settlement",
+    "interval_minutes": 15,
+    "ordinal": 5,
+    "description": "Grades predictions and settles recorded bets once a result is confirmed; re-grades if the provider corrects a score."
+  },
+  {
+    "key": "sync_standings",
+    "name": "League tables",
+    "interval_minutes": 360,
+    "ordinal": 6,
+    "description": "A dated snapshot of each competition's table."
+  },
+  {
+    "key": "sync_squads",
+    "name": "Squads",
+    "interval_minutes": 1440,
+    "ordinal": 7,
+    "description": "Each team's current squad; players leaving or joining are recorded with dates."
+  },
+  {
+    "key": "sync_players",
+    "name": "Player profiles",
+    "interval_minutes": 60,
+    "ordinal": 8,
+    "description": "Birth date, nationality and height for players not yet profiled, a batch at a time."
+  },
+  {
+    "key": "sync_injuries",
+    "name": "Injuries and suspensions",
+    "interval_minutes": 360,
+    "ordinal": 9,
+    "description": "Players reported missing or doubtful for upcoming matches."
+  },
+  {
+    "key": "backfill_history",
+    "name": "Past seasons",
+    "interval_minutes": 0,
+    "ordinal": 10,
+    "description": "Fixtures and match details for earlier seasons. Run by hand; paced to stay inside the daily quota."
+  }
 ]

@@ -45,3 +45,16 @@ export const listPredictions = (params = {}) => request(`/predictions${query(par
 export const getThresholds = () => request('/settings/thresholds');
 export const setThresholds = (t) => request('/settings/thresholds', { method: 'PUT', body: JSON.stringify(t) });
 export const listMarketTypes = () => request('/market-types');
+
+/* Betting apps, bets, settlement, history */
+export const listSportsbooks = () => request('/sportsbooks');
+export const saveSportsbook = (s) => (s.key
+  ? request(`/sportsbooks/${s.key}`, { method: 'PUT', body: JSON.stringify(s) })
+  : request('/sportsbooks', { method: 'POST', body: JSON.stringify(s) }));
+export const listBets = (params = {}) => request(`/bets${query(params)}`);
+export const getBet = (id) => request(`/bets/${id}`);
+export const createBet = (bet) => request('/bets', { method: 'POST', body: JSON.stringify(bet) });
+export const updateBet = (id, bet) => request(`/bets/${id}`, { method: 'PUT', body: JSON.stringify(bet) });
+export const deleteBet = (id) => request(`/bets/${id}`, { method: 'DELETE' });
+export const correctSettlement = (id, body) => request(`/bets/${id}/settlements`, { method: 'POST', body: JSON.stringify(body) });
+export const getHistory = (params = {}) => request(`/history${query(params)}`);
