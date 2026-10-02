@@ -155,7 +155,7 @@ function SlipDrawer() {
                   <button className="link-button danger" onClick={() => removeLeg(i)}>Remove</button>
                 </div>
                 <label className="slip-field">Odds taken
-                  <input value={l.odds} inputMode="decimal" placeholder="2.50, +150, 6/4 or 68%" autoFocus={!l.odds && i === draft.legs.length - 1}
+                  <input value={l.odds} inputMode="text" autoCapitalize="off" autoCorrect="off" placeholder="2.50, +150, 6/4 or 68%" autoFocus={!l.odds && i === draft.legs.length - 1}
                     onChange={(e) => setLeg(i, { odds: e.target.value })} />
                   <span className="subtle">Type the price exactly as your app shows it: decimal (2.50), American (+150), fractional (6/4),
                     or a percentage or cents (68% or 68¢).</span>
@@ -207,7 +207,7 @@ function SlipDrawer() {
               </div>
               {draft.legs.length > 1 && (
                 <label className="slip-field">Total odds shown by the app (optional)
-                  <input value={draft.totalOdds} inputMode="decimal" placeholder={product ? product.toFixed(2) : ''}
+                  <input value={draft.totalOdds} inputMode="text" autoCapitalize="off" autoCorrect="off" placeholder={product ? product.toFixed(2) : ''}
                     onChange={(e) => set({ totalOdds: e.target.value })} />
                   <span className="subtle">Leave empty to multiply the selections. Fill it in if the app boosted or rounded the price.</span>
                 </label>
@@ -328,7 +328,7 @@ function AddSelection({ onAdd, onCancel }) {
           <div className="slip-row">
             {opt.line && (
               <label className="slip-field">Line
-                <input value={line} inputMode="decimal" onChange={(e) => setLine(e.target.value)} />
+                <input value={line} inputMode="text" autoCapitalize="off" autoCorrect="off" onChange={(e) => setLine(e.target.value)} />
               </label>
             )}
             {opt.player ? (

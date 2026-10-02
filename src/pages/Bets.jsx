@@ -103,7 +103,7 @@ function ClosingPrice({ bet, leg, onChanged }) {
     return (
       <form className="closing-form" onSubmit={save}>
         <label className="check">Closing price
-          <input value={value} inputMode="decimal" placeholder="e.g. 1.95" autoFocus onChange={(e) => setValue(e.target.value)} />
+          <input value={value} inputMode="text" autoCapitalize="off" autoCorrect="off" placeholder="e.g. 1.95 or 68%" autoFocus onChange={(e) => setValue(e.target.value)} />
         </label>
         <button className="primary" type="submit">Save</button>
         <button type="button" className="link-button" onClick={() => setOpen(false)}>Cancel</button>
