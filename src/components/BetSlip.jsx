@@ -146,7 +146,7 @@ function SlipDrawer() {
 
   /* Why the button is greyed out, said next to it. */
   const missing = !draft.sportsbook ? 'Choose the betting app.'
-    : contractMode && !hasContracts ? 'Enter the number of contracts.'
+    : contractMode && !hasContracts ? 'Enter the filled quantity (contracts).'
       : contractMode && !stakeMinor ? 'Enter the filled notional (or the limit price to fill it in).'
         : !contractMode && draft.legs.some((l, i) => !parsed[i]) ? 'Enter valid odds for every selection.'
           : !stakeMinor ? 'Enter how much you bet.'
@@ -235,17 +235,17 @@ function SlipDrawer() {
                 <>
                   <p className="subtle">Copy the figures from the filled order in your app; the ones in grey are filled in for you.</p>
                   <div className="order-grid">
-                    <label className="slip-field">Bet ({currencyLabel(currency)})
+                    <label className="slip-field">Entered amount ({currencyLabel(currency)})
                       <MoneyInput currency={currency} value={draft.orderAmount ?? ''} placeholder="10.00" onChange={(e) => set({ orderAmount: e.target.value })} />
                     </label>
-                    <label className="slip-field">Contracts
+                    <label className="slip-field">Filled quantity (contracts)
                       <input className={draft.contractsAuto ? 'auto' : ''} value={draft.contracts} inputMode="decimal" placeholder="14"
                         onChange={(e) => set({ contracts: e.target.value, contractsAuto: false })} />
                     </label>
                     <label className="slip-field">Limit price ({currencyLabel(currency)})
                       <MoneyInput currency={currency} value={draft.limitPrice ?? ''} placeholder="0.68" onChange={(e) => set({ limitPrice: e.target.value })} />
                     </label>
-                    <label className="slip-field">Average filled price ({currencyLabel(currency)})
+                    <label className="slip-field">Avg filled price ({currencyLabel(currency)})
                       <MoneyInput currency={currency} value={draft.avgPrice ?? ''} placeholder={limit ? limit.toFixed(2) : '0.68'}
                         onChange={(e) => set({ avgPrice: e.target.value, stakeAuto: true })} />
                     </label>
@@ -253,7 +253,7 @@ function SlipDrawer() {
                       <MoneyInput currency={currency} className={draft.stakeAuto ? 'auto' : ''} value={draft.stake} placeholder="9.52"
                         onChange={(e) => set({ stake: e.target.value, stakeAuto: false })} />
                     </label>
-                    <label className="slip-field">Commissions &amp; fees ({currencyLabel(currency)})
+                    <label className="slip-field">Commissions and fees ({currencyLabel(currency)})
                       <MoneyInput currency={currency} value={draft.fee} placeholder="0.28" onChange={(e) => set({ fee: e.target.value })} />
                     </label>
                   </div>
@@ -355,12 +355,12 @@ function OrderSummary({ order, contracts, limit, notional, fees, fillCents, curr
   const m = (x) => formatMoney(x, currency);
   const total = (notional ?? 0) + fees;
   const rows = [
-    ['Bet', order ? m(order) : '—'],
-    ['Contracts', contracts ?? '—'],
+    ['Entered amount', order ? m(order) : '—'],
+    ['Filled quantity', contracts ?? '—'],
     ['Limit price', limit ? m(Math.round(limit * 100)) : '—'],
-    ['Average filled price', fillCents ? m(Math.round(fillCents)) : '—'],
+    ['Avg filled price', fillCents ? m(Math.round(fillCents)) : '—'],
     ['Filled notional', notional ? m(notional) : '—'],
-    ['Commissions & fees', m(fees)],
+    ['Commissions and fees', m(fees)],
   ];
   return (
     <div className="order-summary">
@@ -373,7 +373,7 @@ function OrderSummary({ order, contracts, limit, notional, fees, fillCents, curr
           <div><span className="subtle">Pays if it wins</span><span>{m(Math.round(contracts * 100))}</span></div>
           <div><span className="subtle">Realized profit if it wins</span>
             <span className="profit-up">{m(Math.round(contracts * 100) - notional)}</span></div>
-          {fees > 0 && <div><span className="subtle">After commissions &amp; fees</span>
+          {fees > 0 && <div><span className="subtle">After commissions and fees</span>
             <span className={contracts * 100 - total > 0 ? 'profit-up' : 'profit-down'}>{m(Math.round(contracts * 100) - total)}</span></div>}
         </>
       ) : null}

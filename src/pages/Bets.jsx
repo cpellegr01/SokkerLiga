@@ -44,7 +44,7 @@ function BetCard({ bet, onChanged }) {
         <div className="bet-figures">
           {bet.contracts ? (
             <>
-              {bet.orderAmountMinor && <span>Bet {formatMoney(bet.orderAmountMinor, bet.currency)}</span>}
+              {bet.orderAmountMinor && <span>Entered amount {formatMoney(bet.orderAmountMinor, bet.currency)}</span>}
               <span>{bet.contracts} contract{bet.contracts === 1 ? '' : 's'}{bet.limitPrice ? ` · limit ${formatMoney(Math.round(bet.limitPrice * 100), bet.currency)}` : ''}</span>
               <span>Filled notional {formatMoney(bet.stakeMinor, bet.currency)}</span>
             </>
@@ -61,7 +61,7 @@ function BetCard({ bet, onChanged }) {
                * was actually made after them. */
               <>
                 <span>Realized profit <Profit minor={bet.profitMinor + bet.feeMinor + bet.commissionMinor} currency={bet.currency} format={formatMoney} /></span>
-                <span>After commissions &amp; fees <Profit minor={bet.profitMinor} currency={bet.currency} format={formatMoney} /></span>
+                <span>After commissions and fees <Profit minor={bet.profitMinor} currency={bet.currency} format={formatMoney} /></span>
               </>
             ) : <span>Profit <Profit minor={bet.profitMinor} currency={bet.currency} format={formatMoney} /></span>}
           <OutcomeBadge outcome={bet.outcome} />
