@@ -37,7 +37,7 @@ export function learnedInputs(built, priced) {
     h.restDays === null || a.restDays === null ? 0 : clamp((h.restDays - a.restDays) / 7, -2, 2),
     (h.matchesLast14Days - a.matchesLast14Days) / 3,
     posKnown ? (a.table.position - h.table.position) / 20 : 0,
-    f.match.competitionKind === 'continental' ? 1 : 0,
+    f.match.competitionKind === 'continental' || f.match.competitionKind === 'international' ? 1 : 0,
   ];
   return { values: values.map((v) => Math.round(v * 10000) / 10000), dc: { home: mr.home, draw: mr.draw, away: mr.away } };
 }

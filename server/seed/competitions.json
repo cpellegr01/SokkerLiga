@@ -15,5 +15,10 @@
   {"key": "super-lig", "name": "Süper Lig", "country_code": "TR", "country_name": "Turkey", "kind": "league", "is_enabled": 0, "ordinal": 14, "api_football_id": 203},
   {"key": "brasileirao", "name": "Brasileirão Série A", "country_code": "BR", "country_name": "Brazil", "kind": "league", "is_enabled": 0, "ordinal": 15, "api_football_id": 71},
   {"key": "liga-mx", "name": "Liga MX", "country_code": "MX", "country_name": "Mexico", "kind": "league", "is_enabled": 0, "ordinal": 16, "api_football_id": 262},
-  {"key": "conference-league", "name": "UEFA Conference League", "country_code": "EU", "country_name": "Europe", "kind": "continental", "is_enabled": 0, "ordinal": 17, "api_football_id": 848}
+  {"key": "conference-league", "name": "UEFA Conference League", "country_code": "EU", "country_name": "Europe", "kind": "continental", "is_enabled": 0, "ordinal": 17, "api_football_id": 848},
+  {"key": "uefa-nations-league", "name": "UEFA Nations League", "country_code": "EU", "country_name": "Europe", "kind": "international", "is_enabled": 1, "ordinal": 18, "api_football_id": 5},
+  {"key": "wc-qualifiers-europe", "name": "World Cup Qualification (Europe)", "country_code": "EU", "country_name": "Europe", "kind": "international", "is_enabled": 0, "ordinal": 19, "api_football_id": 32},
+  {"key": "euro-qualifiers", "name": "Euro Championship Qualification", "country_code": "EU", "country_name": "Europe", "kind": "international", "is_enabled": 0, "ordinal": 20, "api_football_id": 960},
+  {"key": "concacaf-nations-league", "name": "CONCACAF Nations League", "country_code": "NA", "country_name": "North America", "kind": "international", "is_enabled": 0, "ordinal": 21, "api_football_id": 536},
+  {"key": "international-friendlies", "name": "International Friendlies", "country_code": "WORLD", "country_name": "World", "kind": "international", "is_enabled": 0, "ordinal": 22, "api_football_id": 10}
 ]

@@ -29,8 +29,8 @@ const count = (table, where = '1=1', ...args) => db.prepare(`SELECT COUNT(*) AS 
 describe('Seed data', () => {
   test('the eight original competitions are on, the nine added in Phase 5 off, all with provider ids', () => {
     const rows = db.prepare('SELECT key, api_football_id, is_enabled FROM competitions ORDER BY ordinal').all();
-    assert.equal(rows.length, 17);
-    assert.equal(rows.filter((r) => r.is_enabled).length, 8);
+    assert.equal(rows.length, 22);
+    assert.equal(rows.filter((r) => r.is_enabled).length, 9);
     assert.ok(rows.every((r) => r.api_football_id > 0));
     assert.equal(rows.find((r) => r.key === 'championship').api_football_id, 40);
     assert.equal(rows.find((r) => r.key === 'premier-league').api_football_id, 39);
