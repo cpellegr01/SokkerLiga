@@ -16,6 +16,10 @@ export function parseOdds(input) {
   if (!text) return null;
   const t = text.toLowerCase().replace(/\s+/g, '');
   if (t === 'evens' || t === 'evs' || t === 'even') return { decimal: 2, format: 'fractional', text };
+  /* A bare 10–99 is almost always a price in cents or a percentage (68 for
+   * 68¢), not decimal odds of 68; refuse it rather than guess. oddsHint()
+   * says what to type instead. */
+  if (/^\d{2}$/.test(t)) return null;
 
   const percent = t.match(/^(\d+(?:[.,]\d+)?)(%|¢|c)$/);
   if (percent) {
@@ -46,6 +50,16 @@ export function parseOdds(input) {
 }
 
 const round = (x) => Math.round(x * 10000) / 10000;
+
+/** Why typed odds were refused, and what was probably meant. */
+export function oddsHint(input) {
+  const t = String(input ?? '').trim();
+  if (/^\d{2}$/.test(t)) {
+    return { message: `"${t}" on its own is unclear. If your app shows ${t}% or ${t}¢, type ${t}% — that pays ${(100 / Number(t)).toFixed(2)} per 1 staked. For decimal odds of ${t}, type ${t}.0.`,
+      suggestion: `${t}%` };
+  }
+  return { message: 'Not valid odds yet. Use 2.50, +150, 6/4 or 68%.', suggestion: null };
+}
 
 export function toAmerican(decimal) {
   if (!(decimal > 1)) return '';

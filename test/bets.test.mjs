@@ -1,7 +1,7 @@
 import { test, describe, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { openDatabase } from '../server/db.mjs';
-import { parseOdds, toAmerican, toFractional, parseMoney } from '../src/odds.js';
+import { parseOdds, toAmerican, toFractional, parseMoney, oddsHint } from '../src/odds.js';
 import { grade, settleBet } from '../server/grading.mjs';
 import {
   saveSportsbook, createBet, updateBet, deleteBet, correctSettlement, settleBets, gradePredictions,
@@ -22,6 +22,9 @@ describe('Odds as typed', () => {
     assert.deepEqual(parseOdds('68%'), { decimal: 1.4706, format: 'percent', text: '68%' });
     assert.equal(parseOdds('68¢').decimal, 1.4706);
     assert.equal(parseOdds('68/100').decimal, 1.68, 'a fraction, not a percentage');
+    assert.equal(parseOdds('68'), null, 'a bare 68 is refused, not read as decimal 68');
+    assert.equal(parseOdds('68.0').decimal, 68);
+    assert.match(oddsHint('68').message, /type 68%/);
     for (const bad of ['', '1', '0.9', '+50', 'abc', '3/0', '0%', '100%']) assert.equal(parseOdds(bad), null, bad);
   });
 
@@ -150,7 +153,7 @@ describe('Recording bets', () => {
   test('bad input is refused with a reason', () => {
     assert.throws(() => createBet(db, 'u1', single({ sportsbook: 'nope' })), /betting app/);
     assert.throws(() => createBet(db, 'u1', single({ stake: '0' })), /stake/);
-    assert.throws(() => createBet(db, 'u1', single({ legs: [{ matchId: league.upcomingId, market: 'match_result', selection: 'home', odds: 'x' }] })), /not valid/);
+    assert.throws(() => createBet(db, 'u1', single({ legs: [{ matchId: league.upcomingId, market: 'match_result', selection: 'home', odds: 'x' }] })), /Not valid odds/);
     assert.throws(() => createBet(db, 'u1', single({ legs: [{ matchId: league.upcomingId, market: 'over_under', selection: 'over', odds: '2' }] })), /needs a line/);
     assert.throws(() => createBet(db, 'u1', single({ legs: [{ matchId: league.upcomingId, market: 'btts', selection: 'home', odds: '2' }] })), /not a valid choice/);
     assert.throws(() => createBet(db, 'u1', single({ placedAt: new Date(Date.now() + 86400_000).toISOString() })), /future/);

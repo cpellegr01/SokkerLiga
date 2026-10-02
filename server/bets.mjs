@@ -13,7 +13,7 @@
 
 import { ValidationError, transaction } from './db.mjs';
 import { grade, matchFacts, settleBet, playerOf } from './grading.mjs';
-import { parseOdds, parseMoney } from '../src/odds.js';
+import { parseOdds, parseMoney, oddsHint } from '../src/odds.js';
 import { selectionLabel } from '../src/markets.js';
 
 const nowIso = () => new Date().toISOString();
@@ -97,7 +97,7 @@ function normaliseBet(db, input) {
       throw new ValidationError(`Selection ${i + 1}: "${leg.selection}" is not a valid choice for this market.`);
     }
     const odds = parseOdds(leg.odds);
-    if (!odds) throw new ValidationError(`Selection ${i + 1}: odds "${leg.odds ?? ''}" are not valid. Use 2.50, +150, 6/4 or 68%.`);
+    if (!odds) throw new ValidationError(`Selection ${i + 1}: ${oddsHint(leg.odds).message}`);
     const selId = selectionId(db, match.id, leg.market, leg.line, leg.selection);
     if (seen.has(selId)) throw new ValidationError('The same selection is in the bet twice.');
     seen.add(selId);
@@ -349,7 +349,7 @@ export function setClosingOdds(db, userId, betId, legId, value) {
   let decimal = null;
   if (value !== null && value !== undefined && String(value).trim() !== '') {
     decimal = parseOdds(value)?.decimal ?? null;
-    if (!decimal) throw new ValidationError(`"${value}" is not valid odds. Use 2.50, +150 or 6/4.`);
+    if (!decimal) throw new ValidationError(oddsHint(value).message);
   }
   db.prepare('UPDATE bet_legs SET closing_odds = ? WHERE id = ?').run(decimal, leg.id);
   return getBet(db, betId, userId);

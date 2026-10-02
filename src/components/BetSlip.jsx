@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import * as api from '../api.js';
 import { go } from '../router.js';
-import { parseOdds, describeOdds, parseMoney, formatMoney } from '../odds.js';
+import { parseOdds, describeOdds, parseMoney, formatMoney, oddsHint } from '../odds.js';
 import { MARKET_OPTIONS, selectionLabel } from '../markets.js';
 import { kickoff } from '../format.js';
 import { ErrorBanner } from './ui.jsx';
@@ -163,7 +163,7 @@ function SlipDrawer() {
                 {l.odds && (p
                   ? <span className="subtle">Read as {describeOdds(p.decimal)}: every {formatMoney(100, currency)} staked pays back {formatMoney(Math.round(p.decimal * 100), currency)} if it wins
                     {l.fairOdds ? <ValueNote odds={p.decimal} fair={l.fairOdds} /> : null}</span>
-                  : <span className="danger">Not valid odds yet</span>)}
+                  : <OddsHint text={l.odds} onUse={(v) => setLeg(i, { odds: v })} />)}
               </div>
             );
           })}
@@ -239,6 +239,15 @@ function SlipDrawer() {
         )}
       </aside>
     </>
+  );
+}
+
+function OddsHint({ text, onUse }) {
+  const h = oddsHint(text);
+  return (
+    <span className="danger">{h.message}
+      {h.suggestion && <> <button type="button" className="link-button" onClick={() => onUse(h.suggestion)}>Use {h.suggestion}</button></>}
+    </span>
   );
 }
 

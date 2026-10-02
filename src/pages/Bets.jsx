@@ -56,7 +56,7 @@ function BetCard({ bet, onChanged }) {
         {bet.legs.map((l) => (
           <div key={l.id} className="bet-leg">
             <div className="bet-leg-main">
-              <span>{l.label} <span className="subtle">@ {l.oddsText}{l.oddsFormat !== 'decimal' ? ` (${l.odds.toFixed(2)})` : ''}</span></span>
+              <span>{l.label} <span className="subtle">at {l.oddsText}{l.oddsFormat !== 'decimal' ? ` (pays ${l.odds.toFixed(2)})` : ''}</span></span>
               <a className="subtle" href={href('match', l.matchId, { tab: 'analysis' })}>
                 {l.home} v {l.away} · {l.score ?? kickoff(l.kickoffUtc)} · {l.competition}
               </a>
@@ -64,8 +64,11 @@ function BetCard({ bet, onChanged }) {
             <div className="bet-figures">
               {l.modelProbability !== null ? (
                 <>
-                  <span className="subtle">Model {(l.modelProbability * 100).toFixed(1)}% · fair {l.fairOdds.toFixed(2)}</span>
-                  <span className={l.edge > 0 ? 'profit-up' : 'profit-down'}>Edge {(l.edge * 100).toFixed(1)} pts</span>
+                  <span className="subtle">Model gave it {(l.modelProbability * 100).toFixed(1)}%, so worth {l.fairOdds.toFixed(2)} or better</span>
+                  <span className={l.edge > 0 ? 'profit-up' : 'profit-down'}>
+                    {l.edge > 0 ? `Your price beat that: edge ${(l.edge * 100).toFixed(1)} pts` : `Your price was below that: no edge (${(l.edge * 100).toFixed(1)} pts)`}
+                  </span>
+                  {l.edge > 0.25 && <span className="danger">An edge this big usually means the odds were typed wrongly — check them with Edit.</span>}
                   {l.followedRecommendation !== null && <DecisionBadge decision={l.followedRecommendation ? 'recommend' : 'pass'} prefix="Model: " />}
                 </>
               ) : <span className="subtle">No analysis before this bet</span>}
@@ -102,7 +105,7 @@ function ClosingPrice({ bet, leg, onChanged }) {
   if (open) {
     return (
       <form className="closing-form" onSubmit={save}>
-        <label className="check">Closing price
+        <label className="check">Price at kickoff, as your app showed it
           <input value={value} inputMode="text" autoCapitalize="off" autoCorrect="off" placeholder="e.g. 1.95 or 68%" autoFocus onChange={(e) => setValue(e.target.value)} />
         </label>
         <button className="primary" type="submit">Save</button>
@@ -115,10 +118,12 @@ function ClosingPrice({ bet, leg, onChanged }) {
     <div className="bet-figures">
       {leg.closingOdds ? (
         <span className={leg.clv > 0 ? 'profit-up' : 'profit-down'}>
-          Closed at {leg.closingOdds.toFixed(2)} · {leg.clv > 0 ? 'beat the close by' : 'behind the close by'} {Math.abs(leg.clv * 100).toFixed(1)}%
+          Price at kickoff {leg.closingOdds.toFixed(2)}; yours {leg.odds.toFixed(2)} —{' '}
+          {leg.clv > 0 ? `better than the close by ${(leg.clv * 100).toFixed(1)}%` : leg.clv < 0 ? `worse than the close by ${(-leg.clv * 100).toFixed(1)}%` : 'the same as the close'}
+          {Math.abs(leg.clv) > 1 && <span className="danger"> · check the two prices are in the same format</span>}
         </span>
       ) : null}
-      <button className="link-button" onClick={() => setOpen(true)}>{leg.closingOdds ? 'Change closing price' : 'Add closing price'}</button>
+      <button className="link-button" onClick={() => setOpen(true)}>{leg.closingOdds ? 'Change price at kickoff' : 'Add price at kickoff (optional)'}</button>
     </div>
   );
 }

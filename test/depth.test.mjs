@@ -149,7 +149,7 @@ describe('Closing prices', () => {
     assert.ok(after.legs[0].clv > 0.07);
     const h = bettingHistory(db, 'u1');
     assert.deepEqual({ legs: h.totals.closing.legs, beat: h.totals.closing.beat }, { legs: 1, beat: 1 });
-    assert.throws(() => setClosingOdds(db, 'u1', bet.id, bet.legs[0].id, 'abc'), /not valid odds/);
+    assert.throws(() => setClosingOdds(db, 'u1', bet.id, bet.legs[0].id, 'abc'), /Not valid odds/);
     assert.equal(setClosingOdds(db, 'u1', bet.id, bet.legs[0].id, '').legs[0].closingOdds, null);
   });
 });
