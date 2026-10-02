@@ -3,6 +3,11 @@ import * as api from '../api.js';
 import { href, go } from '../router.js';
 import { kickoff } from '../format.js';
 
+/* "Tue, Mar 4" for a played leg; with the kickoff time when it is still to come. */
+const legDate = (iso, withTime) => new Date(iso).toLocaleString(undefined, withTime
+  ? { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }
+  : { weekday: 'short', day: 'numeric', month: 'short' });
+
 const longDay = (iso) => new Date(iso.length === 10 ? `${iso}T12:00:00` : iso)
   .toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' });
 import { useApi, Page, Loading, ErrorBanner, Empty, Crest } from '../components/ui.jsx';
@@ -152,15 +157,17 @@ function Tie({ tie }) {
         </div>
       ))}
       <div className="bracket-legs subtle">
-        {tie.kind === 'two-legs' && <span>Aggregate · </span>}
-        {tie.kind === 'series' && <span>Series, wins · </span>}
-        {tie.legs.map((l, i) => (
-          <span key={l.matchId}>{i ? ' · ' : ''}
-            <a href={href('match', l.matchId)} title={`${l.home} ${l.score ?? 'v'} ${l.away}`}>
-              {l.score ? `${l.score}${l.pens ? ` (pens ${l.pens})` : ''}` : `Upcoming ${kickoff(l.kickoffUtc)}`}
+        {tie.kind === 'two-legs' && <div>Aggregate over two legs</div>}
+        {tie.kind === 'series' && <div>Series: games won</div>}
+        {tie.legs.map((l) => {
+          const upcoming = !l.score;
+          return (
+            <a key={l.matchId} className="bracket-leg" href={href('match', l.matchId)} title={`${l.home} v ${l.away}`}>
+              <span className="nowrap">{legDate(l.kickoffUtc, upcoming)}</span>
+              <span className="bracket-leg-result">{upcoming ? 'Upcoming' : `${l.home} ${l.score}${l.pens ? ` (pens ${l.pens})` : ''}`}</span>
             </a>
-          </span>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

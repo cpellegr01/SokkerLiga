@@ -606,3 +606,6 @@ input.auto { color: var(--muted); }
 .bracket-pair.joins::after { content: ''; position: absolute; right: -1rem; top: 25%; bottom: 25%; border-right: 1px solid var(--muted); }
 /* into the tie it feeds */
 .bracket-slot.fed::before { content: ''; position: absolute; left: -1rem; top: 50%; width: 1rem; border-top: 1px solid var(--muted); }
+.bracket-leg { display: flex; justify-content: space-between; gap: 0.5rem; }
+.bracket-leg-result { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: right; }
+.bracket-round { min-width: 240px; flex-basis: 240px; } @media (max-width: 720px) { .bracket-round { min-width: 210px; flex-basis: 210px; } }
