@@ -6,4 +6,4 @@
  *
  * Format: MAJOR.MINOR.BUILD — bump BUILD for a fix, MINOR for a feature.
  */
-export const VERSION = '0.5.22';
+export const VERSION = '0.5.23';

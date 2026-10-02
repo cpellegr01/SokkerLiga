@@ -12,6 +12,10 @@
 const GROUP_ROUND = /regular season|league stage|league phase|group|^league [a-z]\b|matchday|^league$/i;
 const QUALIFYING = /qualif|preliminary/i;
 const THIRD_PLACE = /3rd place|third place/i;
+/* Promotion/relegation play-offs (Nations League "Play-offs A/B") are
+ * knockouts of their own, not a road to the final. */
+const SIDE_ROUND = /play-?offs? [a-d] ?\/ ?[a-d]|promotion|relegation/i;
+const isKnockout = (round) => !GROUP_ROUND.test(round) && !QUALIFYING.test(round);
 
 /** Competitions with knockout matches, for the picker. */
 export function bracketCompetitions(db) {
@@ -75,13 +79,23 @@ function tieOf(legs) {
  * @returns {{ competition, season, rounds: [{ name, ties }], thirdPlace, qualifying: [{ name, ties }] }}
  */
 export function bracket(db, competitionId, seasonId = null) {
-  const season = seasonId
-    ? db.prepare('SELECT * FROM seasons WHERE id = ? AND competition_id = ?').get(Number(seasonId), Number(competitionId))
-    : db.prepare(`SELECT s.* FROM seasons s WHERE s.competition_id = ? AND EXISTS (SELECT 1 FROM matches m WHERE m.season_id = s.id)
-                  ORDER BY s.is_current DESC, s.year DESC LIMIT 1`).get(Number(competitionId));
+  /* Without a season asked for: the current one if it has knockout rounds
+   * yet, otherwise the latest season that has — saying why. */
+  const seasons = db.prepare(`SELECT s.*, (SELECT GROUP_CONCAT(DISTINCT m.round) FROM matches m WHERE m.season_id = s.id) AS rounds
+                              FROM seasons s WHERE s.competition_id = ? ORDER BY s.is_current DESC, s.year DESC`).all(Number(competitionId));
+  const hasKnockouts = (x) => (x?.rounds ?? '').split(',').some((r) => r && isKnockout(r) && !SIDE_ROUND.test(r) && !THIRD_PLACE.test(r));
+  let note = null;
+  let season = seasonId ? seasons.find((x) => x.id === Number(seasonId)) : seasons[0];
+  if (!seasonId && season && !hasKnockouts(season)) {
+    const earlier = seasons.find(hasKnockouts);
+    if (earlier) {
+      note = `${season.label} is still in its group or league phase; its knockout rounds have not been scheduled yet. Showing ${earlier.label}.`;
+      season = earlier;
+    }
+  }
   const competition = db.prepare('SELECT id, name, logo_url AS logo, country_name AS country FROM competitions WHERE id = ?')
     .get(Number(competitionId));
-  if (!competition || !season) return { competition: competition ?? null, season: null, rounds: [], thirdPlace: null, qualifying: [] };
+  if (!competition || !season) return { competition: competition ?? null, season: null, note: null, rounds: [], sideRounds: [], thirdPlace: null, qualifying: [] };
 
   const rows = db.prepare(`
     SELECT m.id, m.round, m.kickoff_utc, m.status_key, m.home_goals, m.away_goals, m.home_pens, m.away_pens,
@@ -113,7 +127,8 @@ export function bracket(db, competitionId, seasonId = null) {
 
   const thirdPlace = built.find((r) => THIRD_PLACE.test(r.name)) ?? null;
   const qualifying = built.filter((r) => QUALIFYING.test(r.name));
-  const main = built.filter((r) => !THIRD_PLACE.test(r.name) && !QUALIFYING.test(r.name));
+  const side = built.filter((r) => SIDE_ROUND.test(r.name));
+  const main = built.filter((r) => !THIRD_PLACE.test(r.name) && !QUALIFYING.test(r.name) && !SIDE_ROUND.test(r.name));
 
   /* Arrange from the final backwards: the ties whose teams play in a later
    * tie go together, in that tie's order. */
@@ -153,7 +168,9 @@ export function bracket(db, competitionId, seasonId = null) {
   return {
     competition,
     season: { id: season.id, label: season.label },
+    note,
     rounds: [...main.map(({ name, ties }) => ({ name, ties })), ...projected],
+    sideRounds: side.map(({ name, ties }) => ({ name, ties })),
     thirdPlace: thirdPlace ? { name: thirdPlace.name, ties: thirdPlace.ties } : null,
     qualifying: qualifying.map(({ name, ties }) => ({ name, ties })),
   };

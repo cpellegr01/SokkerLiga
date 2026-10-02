@@ -35,8 +35,9 @@ export default function Brackets({ id, params }) {
       )}
       {id && loading && !data && <Loading />}
       {data && (
-        !data.rounds.length && !data.qualifying.length ? <Empty>{data.competition?.name ?? 'This competition'} has no knockout rounds in {data.season?.label ?? 'this season'}.</Empty> : (
+        !data.rounds.length && !data.qualifying.length && !data.sideRounds.length ? <Empty>{data.competition?.name ?? 'This competition'} has no knockout rounds in {data.season?.label ?? 'this season'}.</Empty> : (
           <>
+            {data.note && <div className="banner warn">{data.note}</div>}
             <div className="bracket-head">
               <Crest src={data.competition.logo} name={data.competition.name} size={28} />
               <h2>{data.competition.name} <span className="subtle">{data.season.label}</span></h2>
@@ -51,6 +52,19 @@ export default function Brackets({ id, params }) {
                 </div>
               ))}
             </div>
+            {data.sideRounds.length > 0 && (
+              <>
+                <h3>Promotion and relegation play-offs</h3>
+                <div className="bracket">
+                  {data.sideRounds.map((r) => (
+                    <div key={r.name} className="bracket-round">
+                      <h4>{r.name}</h4>
+                      <div className="bracket-ties">{r.ties.map((t) => <Tie key={t.key} tie={t} last />)}</div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
             {data.thirdPlace && (
               <div className="bracket-extra">
                 <h4>{data.thirdPlace.name}</h4>

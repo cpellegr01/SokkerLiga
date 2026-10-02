@@ -395,5 +395,25 @@ describe('Brackets', () => {
     assert.equal(p.rounds[1].ties[0].slots[0].id, T[0], 'a decided tie sends its winner on');
     assert.match(p.rounds[1].ties[0].slots[1].placeholder, /^Winner of /);
     assert.equal(p.rounds[2].ties.length, 1);
+
+    /* A season still in its league phase falls back to the last one with
+     * knockouts, and says so; promotion play-offs are kept to one side. */
+    const nl = db.prepare("SELECT id FROM competitions WHERE key = 'uefa-nations-league'").get().id;
+    const old = Number(db.prepare(`INSERT INTO seasons (competition_id, year, label, start_date, end_date, is_current)
+                                   VALUES (?, 2024, '2024/25', '2024-09-01', '2025-06-30', 0)`).run(nl).lastInsertRowid);
+    const cur = Number(db.prepare(`INSERT INTO seasons (competition_id, year, label, start_date, end_date, is_current)
+                                   VALUES (?, 2026, '2026', '2026-09-01', '2027-06-30', 1)`).run(nl).lastInsertRowid);
+    const nm = (season, round, h, a, hg, ag, day) => db.prepare(`INSERT INTO matches (season_id, round, kickoff_utc, home_team_id, away_team_id,
+        status_key, home_goals, away_goals, source_key, source_ref, fetched_at) VALUES (?, ?, ?, ?, ?, 'finished', ?, ?, 'api-football', ?, ?)`)
+      .run(season, round, day, T[h], T[a], hg, ag, `nl${season}${round}${h}`, now());
+    nm(old, 'Play-offs A/B', 4, 5, 1, 0, '2025-03-20T17:00:00.000Z');
+    nm(old, 'Semi-finals', 0, 1, 2, 1, '2025-06-04T19:00:00.000Z'); nm(old, 'Semi-finals', 2, 3, 0, 1, '2025-06-05T19:00:00.000Z');
+    nm(old, 'Final', 0, 3, 1, 0, '2025-06-08T19:00:00.000Z');
+    nm(cur, 'League A - 1', 0, 1, 1, 1, '2026-09-24T18:45:00.000Z');
+    const nb = bracket(db, nl);
+    assert.equal(nb.season.label, '2024/25');
+    assert.match(nb.note, /2026 is still in its group or league phase/);
+    assert.deepEqual(nb.rounds.map((r) => r.name), ['Semi-finals', 'Final']);
+    assert.deepEqual(nb.sideRounds.map((r) => r.name), ['Play-offs A/B']);
   });
 });
