@@ -29,87 +29,160 @@ function BetCard({ bet, onChanged }) {
   const slip = useSlip();
   const [correcting, setCorrecting] = useState(false);
   const [error, setError] = useState(null);
+  const m = (x) => formatMoney(x, bet.currency);
   const remove = async () => {
-    if (!window.confirm('Delete this bet? It is kept in the history but no longer counted.')) return;
+    if (!window.confirm('Are you sure you want to delete this bet?\n\nIt stops counting in your history, profit and bankroll.')) return;
     try { await api.deleteBet(bet.id); onChanged(); } catch (e) { setError(e.message); }
   };
+  const single = bet.legs.length === 1 ? bet.legs[0] : null;
+  const charges = bet.feeMinor + bet.commissionMinor;
+  const settled = bet.outcome !== 'pending' && bet.profitMinor !== null;
 
   return (
     <div className="card bet-card">
-      <div className="bet-head">
-        <div>
-          <div>{bet.kind === 'parlay' ? `Parlay of ${bet.legs.length}` : 'Single'} · {bet.sportsbook.name}</div>
-          <div className="subtle">Placed {longDate(bet.placedAt)}</div>
+      {/* What, where, and how it ended — the one line to read first. */}
+      <div className="bet-top">
+        <div className="bet-what">
+          <div className="bet-title">{single ? single.label : `Parlay of ${bet.legs.length}`}</div>
+          {single && (
+            <a className="subtle" href={href('match', single.matchId, { tab: 'analysis' })}>
+              {single.home} v {single.away} · {single.score ?? kickoff(single.kickoffUtc)} · {single.competition}
+            </a>
+          )}
+          <div className="subtle">{bet.sportsbook.name} · placed {longDate(bet.placedAt)}</div>
         </div>
-        <div className="bet-figures">
-          {bet.contracts ? (
-            <>
-              {bet.orderAmountMinor && <span>Entered amount {formatMoney(bet.orderAmountMinor, bet.currency)}</span>}
-              <span>{bet.contracts} contract{bet.contracts === 1 ? '' : 's'}{bet.limitPrice ? ` · limit ${formatMoney(Math.round(bet.limitPrice * 100), bet.currency)}` : ''}</span>
-              <span>Filled notional {formatMoney(bet.stakeMinor, bet.currency)}</span>
-            </>
-          ) : <span>Bet {formatMoney(bet.stakeMinor, bet.currency)}</span>}
-          {bet.feeMinor + bet.commissionMinor > 0 && (
-            <span>{bet.contracts ? 'Commissions and fees' : 'Fees'} {formatMoney(bet.feeMinor + bet.commissionMinor, bet.currency)}</span>
-          )}
-          {bet.totalCostMinor !== bet.stakeMinor && <span>Total cost {formatMoney(bet.totalCostMinor, bet.currency)}</span>}
-          <span>Odds {bet.totalOdds.toFixed(2)}</span>
-          {bet.outcome === 'pending'
-            ? <span>Returns {formatMoney(bet.potentialPayoutMinor, bet.currency)}</span>
-            : bet.contracts && bet.feeMinor + bet.commissionMinor > 0 && bet.profitMinor !== null ? (
-              /* As the app reports it (before commissions & fees), then what
-               * was actually made after them. */
-              <>
-                <span>Realized profit <Profit minor={bet.profitMinor + bet.feeMinor + bet.commissionMinor} currency={bet.currency} format={formatMoney} /></span>
-                <span>After commissions and fees <Profit minor={bet.profitMinor} currency={bet.currency} format={formatMoney} /></span>
-              </>
-            ) : <span>Profit <Profit minor={bet.profitMinor} currency={bet.currency} format={formatMoney} /></span>}
+        <div className="bet-headline">
+          <div className="bet-icons">
+            <button className="icon-button" onClick={() => slip.edit(bet)} aria-label="Edit this bet" title="Edit"><EditIcon /></button>
+            <button className="icon-button danger" onClick={remove} aria-label="Delete this bet" title="Delete"><TrashIcon /></button>
+          </div>
           <OutcomeBadge outcome={bet.outcome} />
-          {bet.settledBy === 'manual' && <span className="subtle">Corrected by hand</span>}
-          {bet.settledBy === 'manual' && (
-            <button className="link-button" onClick={async () => {
-              try { await api.useCalculatedResult(bet.id); onChanged(); } catch (e) { setError(e.message); }
-            }}>Use the calculated result</button>
-          )}
+          {settled
+            ? <span className="bet-big"><Profit minor={bet.profitMinor} currency={bet.currency} format={formatMoney} /></span>
+            : <span className="bet-big subtle">Pays {m(bet.potentialPayoutMinor)} if it wins</span>}
         </div>
       </div>
 
-      <div className="bet-legs">
-        {bet.legs.map((l) => (
-          <div key={l.id} className="bet-leg">
-            <div className="bet-leg-main">
-              <span>{l.label} <span className="subtle">at {l.oddsText}{l.oddsFormat !== 'decimal' ? ` (pays ${l.odds.toFixed(2)})` : ''}</span></span>
-              <a className="subtle" href={href('match', l.matchId, { tab: 'analysis' })}>
-                {l.home} v {l.away} · {l.score ?? kickoff(l.kickoffUtc)} · {l.competition}
-              </a>
-            </div>
-            <div className="bet-figures">
-              {l.modelProbability !== null ? (
-                <>
-                  <span className="subtle">Model gave it {(l.modelProbability * 100).toFixed(1)}%, so worth {l.fairOdds.toFixed(2)} or better</span>
-                  <span className={l.edge > 0 ? 'profit-up' : 'profit-down'}>
-                    {l.edge > 0 ? `Your price beat that: edge ${(l.edge * 100).toFixed(1)} pts` : `Your price was below that: no edge (${(l.edge * 100).toFixed(1)} pts)`}
-                  </span>
-                  {l.edge > 0.25 && <span className="danger">An edge this big usually means the odds were typed wrongly — check them with Edit.</span>}
-                  {l.followedRecommendation !== null && <DecisionBadge decision={l.followedRecommendation ? 'recommend' : 'pass'} prefix="Model: " />}
-                </>
-              ) : <span className="subtle">No analysis before this bet</span>}
-              {bet.legs.length > 1 && <OutcomeBadge outcome={l.outcome} />}
-            </div>
-            <ClosingPrice bet={bet} leg={l} onChanged={onChanged} />
-          </div>
-        ))}
+      <div className="bet-sections">
+        <section>
+          <h4>The order</h4>
+          <Facts rows={bet.contracts ? [
+            bet.orderAmountMinor && ['Entered amount', m(bet.orderAmountMinor)],
+            ['Filled quantity', `${bet.contracts} contract${bet.contracts === 1 ? '' : 's'}`],
+            bet.limitPrice && ['Limit price', m(Math.round(bet.limitPrice * 100))],
+            ['Avg filled price', m(Math.round(bet.stakeMinor / bet.contracts))],
+            ['Filled notional', m(bet.stakeMinor)],
+            ['Commissions and fees', m(charges)],
+            ['Total cost', m(bet.totalCostMinor), 'strong'],
+          ] : [
+            ['Bet', m(bet.stakeMinor)],
+            [single ? 'Odds' : 'Total odds', single ? `${single.oddsText}${single.oddsFormat !== 'decimal' ? ` (pays ${single.odds.toFixed(2)})` : ''}` : bet.totalOdds.toFixed(2)],
+            charges > 0 && ['Fees', m(charges)],
+            charges > 0 && ['Total cost', m(bet.totalCostMinor), 'strong'],
+          ]} />
+        </section>
+
+        <section>
+          <h4>The result</h4>
+          {settled ? (
+            <Facts rows={[
+              ['Paid out', m(bet.profitMinor + bet.totalCostMinor)],
+              bet.contracts && charges > 0 && ['Realized profit',
+                <Profit key="r" minor={bet.profitMinor + charges} currency={bet.currency} format={formatMoney} />],
+              charges > 0 && ['Commissions and fees', `−${m(charges)}`],
+              [charges > 0 ? 'Profit after fees' : 'Profit', <Profit key="p" minor={bet.profitMinor} currency={bet.currency} format={formatMoney} />, 'strong'],
+            ]} />
+          ) : (
+            <Facts rows={[['Status', 'Waiting for the result'], ['Pays if it wins', m(bet.potentialPayoutMinor)],
+              ['Profit if it wins', m(bet.potentialPayoutMinor - bet.totalCostMinor)]]} />
+          )}
+          {bet.settledBy === 'manual' && (
+            <p className="subtle">
+              Corrected by hand ·{' '}
+              <button className="link-button" onClick={async () => {
+                try { await api.useCalculatedResult(bet.id); onChanged(); } catch (e) { setError(e.message); }
+              }}>Use the calculated result</button>
+            </p>
+          )}
+        </section>
+
+        {single && (
+          <section>
+            <h4>The model's view</h4>
+            <ModelView leg={single} />
+            <ClosingPrice bet={bet} leg={single} onChanged={onChanged} />
+          </section>
+        )}
       </div>
+
+      {!single && (
+        <section className="bet-parlay">
+          <h4>Selections</h4>
+          {bet.legs.map((l) => (
+            <div key={l.id} className="bet-leg">
+              <div className="bet-leg-main">
+                <span>{l.label} <span className="subtle">at {l.oddsText}{l.oddsFormat !== 'decimal' ? ` (pays ${l.odds.toFixed(2)})` : ''}</span>
+                  {' '}<OutcomeBadge outcome={l.outcome} /></span>
+                <a className="subtle" href={href('match', l.matchId, { tab: 'analysis' })}>
+                  {l.home} v {l.away} · {l.score ?? kickoff(l.kickoffUtc)} · {l.competition}
+                </a>
+              </div>
+              <div><ModelView leg={l} /><ClosingPrice bet={bet} leg={l} onChanged={onChanged} /></div>
+            </div>
+          ))}
+        </section>
+      )}
 
       {bet.notes && <p className="subtle">{bet.notes}</p>}
       <ErrorBanner error={error} />
       <div className="bet-actions">
-        <button className="link-button" onClick={() => slip.edit(bet)}>Edit</button>
         <button className="link-button" onClick={() => setCorrecting((c) => !c)}>Correct the result</button>
-        <button className="link-button danger" onClick={remove}>Delete</button>
       </div>
       {correcting && <CorrectForm bet={bet} onDone={() => { setCorrecting(false); onChanged(); }} />}
     </div>
+  );
+}
+
+const EditIcon = () => (
+  <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+    <path d="M11.2 2.3a1.6 1.6 0 0 1 2.3 2.3L5.6 12.5 2.5 13.5l1-3.1z" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
+    <path d="M10 3.5l2.5 2.5" stroke="currentColor" strokeWidth="1.3" />
+  </svg>
+);
+const TrashIcon = () => (
+  <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+    <path d="M2.5 4h11M6 4V2.5h4V4M3.8 4l.7 9.5h7l.7-9.5M6.5 6.5v4.5M9.5 6.5v4.5" fill="none" stroke="currentColor" strokeWidth="1.3"
+      strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+
+/* Label / value rows; falsy rows are skipped. */
+function Facts({ rows }) {
+  return (
+    <dl className="facts">
+      {rows.filter(Boolean).map(([k, v, tone]) => (
+        <div key={k} className={tone === 'strong' ? 'facts-total' : ''}><dt>{k}</dt><dd>{v}</dd></div>
+      ))}
+    </dl>
+  );
+}
+
+/* What the model thought, and whether the price taken beat it. */
+function ModelView({ leg: l }) {
+  if (l.modelProbability === null) return <p className="subtle">No analysis was made before this bet.</p>;
+  return (
+    <>
+      <Facts rows={[
+        ['Model gave it', `${(l.modelProbability * 100).toFixed(1)}%`],
+        ['Worth', `${l.fairOdds.toFixed(2)} or better`],
+        ['Your price', l.odds.toFixed(2)],
+        ['Edge', <span key="e" className={l.edge > 0 ? 'profit-up' : 'profit-down'}>
+          {l.edge > 0 ? `+${(l.edge * 100).toFixed(1)} pts` : `None (${(l.edge * 100).toFixed(1)} pts)`}</span>],
+        l.followedRecommendation !== null && ['Recommendation',
+          <DecisionBadge key="d" decision={l.followedRecommendation ? 'recommend' : 'pass'} />],
+      ]} />
+      {l.edge > 0.25 && <p className="danger">An edge this big usually means the odds were typed wrongly — check them with Edit.</p>}
+    </>
   );
 }
 
@@ -140,7 +213,7 @@ function ClosingPrice({ bet, leg, onChanged }) {
     <div className="bet-figures">
       {leg.closingOdds ? (
         <span className={leg.clv > 0 ? 'profit-up' : 'profit-down'}>
-          Price at kickoff {leg.closingOdds.toFixed(2)}; yours {leg.odds.toFixed(2)} —{' '}
+          Price at kickoff {leg.closingOdds.toFixed(2)} —{' '}
           {leg.clv > 0 ? `better than the close by ${(leg.clv * 100).toFixed(1)}%` : leg.clv < 0 ? `worse than the close by ${(-leg.clv * 100).toFixed(1)}%` : 'the same as the close'}
           {Math.abs(leg.clv) > 1 && <span className="danger"> · check the two prices are in the same format</span>}
         </span>

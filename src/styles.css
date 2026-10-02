@@ -532,3 +532,31 @@ input.auto { color: var(--muted); }
 .money-input { position: relative; display: block; width: 100%; }
 .money-input .money-prefix { position: absolute; left: 0.6rem; top: 50%; transform: translateY(-50%); color: var(--muted); pointer-events: none; }
 .money-input input { width: 100%; padding-left: 1.5rem; }
+
+/* ------------------------------------------------------- bet card */
+.bet-top { display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap; align-items: flex-start; }
+.bet-what { display: flex; flex-direction: column; gap: 0.15rem; min-width: 0; }
+.bet-title { font-size: var(--fs-section); }
+.bet-headline { display: flex; flex-direction: column; align-items: flex-end; gap: 0.3rem; }
+.bet-big { font-size: var(--fs-section); white-space: nowrap; }
+.bet-sections { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap: 0.75rem; }
+.bet-sections section, .bet-parlay { background: var(--surface-2); border-radius: 8px; padding: 0.6rem 0.75rem; }
+.bet-sections h4, .bet-parlay h4 { margin: 0 0 0.4rem; }
+.facts { margin: 0; display: flex; flex-direction: column; gap: 0.2rem; }
+.facts > div { display: flex; justify-content: space-between; gap: 0.75rem; }
+.facts dt { color: var(--muted); }
+.facts dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; }
+.facts-total { border-top: 1px solid var(--border); padding-top: 0.25rem; margin-top: 0.1rem; }
+.bet-sections .bet-figures { margin-top: 0.4rem; }
+@media (max-width: 720px) { .bet-headline { align-items: flex-start; flex-direction: row; } }
+.bet-icons { display: flex; gap: 0.25rem; }
+.icon-button { border: 1px solid var(--border); background: var(--surface-2); border-radius: 8px; width: 32px; height: 32px; padding: 0;
+  display: inline-flex; align-items: center; justify-content: center; color: var(--muted); cursor: pointer; }
+.icon-button:hover { color: var(--accent); border-color: var(--accent); }
+.icon-button.danger:hover { color: var(--loss); border-color: var(--loss); }
+@media (max-width: 720px) { .icon-button { width: 40px; height: 40px; } }
+.bet-card { position: relative; }
+.bet-card .bet-icons { position: absolute; top: 0.75rem; right: 0.75rem; }
+.bet-card .bet-top { padding-right: 84px; }
+@media (max-width: 720px) { .bet-card .bet-top { padding-right: 96px; } }
+.facts dd { white-space: nowrap; }
