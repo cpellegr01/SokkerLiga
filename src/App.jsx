@@ -51,7 +51,10 @@ export default function App() {
     <BetSlipProvider>
     <div className="shell">
       <header className="topbar">
-        <button className="menu-button" aria-label="Menu" aria-expanded={menuOpen} onClick={() => setMenuOpen((o) => !o)}>☰</button>
+        <button className={menuOpen ? 'menu-button open' : 'menu-button'} aria-label={menuOpen ? 'Close menu' : 'Menu'}
+          aria-expanded={menuOpen} onClick={() => setMenuOpen((o) => !o)}>
+          <span /><span /><span />
+        </button>
         <a className="brand" href={href('dashboard')} aria-label="SokkerLiga — dashboard">
           <img className="brand-icon" src="/logo-mark.png" alt="" width="32" height="32" />
           <img className="brand-wordmark" src="/logo-wordmark.png" alt="SokkerLiga" height="22" />
