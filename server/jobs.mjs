@@ -129,7 +129,9 @@ export const JOBS = {
         OR (kickoff_utc BETWEEN ? AND ? AND status_key = 'scheduled')
       )
       ORDER BY kickoff_utc`).all(SOURCE_KEY, iso(-8 * 60), iso(0), iso(0), iso(75));
-    const backlogBatches = 5;
+    /* 20 batches of 20 a run: a few hundred requests an hour while history
+     * fills in, then nothing once the backlog is empty. */
+    const backlogBatches = 20;
     const backlog = db.prepare(`
       SELECT id, source_ref FROM matches
       WHERE source_key = ? AND ${enabled} AND details_fetched_at IS NULL
@@ -336,6 +338,7 @@ export function syncStatus(db) {
   const quota = db.prepare('SELECT * FROM provider_quota WHERE source_key = ? ORDER BY day DESC LIMIT 1').get(SOURCE_KEY);
   return {
     providerConfigured: !!process.env.API_FOOTBALL_KEY,
+    explainerConfigured: !!process.env.ANTHROPIC_API_KEY,
     quota: quota ?? null,
     jobs: jobs.map((j) => {
       const run = last.get(j.key);

@@ -225,7 +225,7 @@ Predictions and bet legs both point at a `selection`, so a bet on "Arsenal
 | `bet_legs` | `id`, `bet_id`, `match_id`, `selection_id`, `odds_taken` (decimal), `odds_text`, `odds_format`, `prediction_id` (nullable), `recommendation_id` (nullable), `model_probability_at_bet`, `fair_odds_at_bet`, `edge_at_bet`, `ev_at_bet` |
 | `bet_revisions` | `bet_id`, `changed_at`, `old_json`, `reason` — editing a bet (wrong stake typed) keeps the old version |
 | `settlements` | append-only: `id`, `bet_leg_id` or `bet_id`, `outcome` (won/lost/push/void/half_won/half_lost/pending), `source` (auto/manual), `reason`, `settled_at`, `profit_minor` — latest row is current |
-| `recommendation_thresholds` | `user_id`, `min_confidence`, `min_probability`, `max_fair_odds`, `min_edge` (applied to odds Claudio types), `markets_json`, `effective_from` — dated rows |
+| `recommendation_thresholds` | `user_id`, `min_confidence`, `min_probability`, `min_fair_odds` (keeps near-certainties out; default 1.30), `max_fair_odds`, `markets_json`, `effective_from` — dated rows |
 
 The `*_at_bet` columns are copied at the moment the bet is recorded, from
 the latest prediction made **before both `placed_at` and kickoff**. If the

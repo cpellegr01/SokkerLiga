@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import * as api from '../api.js';
 import { ago } from '../format.js';
 import { useApi, Page, Loading, ErrorBanner, Crest } from '../components/ui.jsx';
@@ -41,6 +41,13 @@ export default function Settings() {
                 </span>
               )}
             </p>
+            <p>
+              Claude (match explanations):{' '}
+              {sync.data.explainerConfigured
+                ? <span className="pill finished">Key configured</span>
+                : <span className="pill failed">No key</span>}
+              {!sync.data.explainerConfigured && <span className="subtle"> · Analyses still run, without the written explanation. Add ANTHROPIC_API_KEY to the same file.</span>}
+            </p>
             {!sync.data.providerConfigured && (
               <p className="subtle small">The key lives on the server in /etc/sokkerliga/sokkerliga.env as API_FOOTBALL_KEY. It is never shown here.</p>
             )}
@@ -78,6 +85,8 @@ export default function Settings() {
         </>
       )}
 
+      <Thresholds />
+
       <h2>Competitions</h2>
       <p className="subtle">Switched-off competitions are not refreshed and are hidden from match lists. Their history is kept.</p>
       <ErrorBanner error={comps.error} />
@@ -93,5 +102,69 @@ export default function Settings() {
         </div>
       )}
     </Page>
+  );
+}
+
+function Thresholds() {
+  const current = useApi(() => api.getThresholds(), []);
+  const markets = useApi(() => api.listMarketTypes(), []);
+  const [form, setForm] = useState(null);
+  const [saved, setSaved] = useState(null);
+  const [error, setError] = useState(null);
+  useEffect(() => {
+    if (current.data && !form) setForm({ ...current.data, minProbability: Math.round(current.data.minProbability * 100) });
+  }, [current.data, form]);
+  if (!form || !markets.data) return <Loading />;
+
+  const toggle = (key) => {
+    const all = markets.data.map((m) => m.key);
+    const on = form.markets.length ? form.markets : all;
+    const next = on.includes(key) ? on.filter((k) => k !== key) : [...on, key];
+    setForm({ ...form, markets: next.length === all.length ? [] : next });
+  };
+  const enabled = (key) => !form.markets.length || form.markets.includes(key);
+  const save = async (e) => {
+    e.preventDefault();
+    setError(null);
+    try {
+      await api.setThresholds({ ...form, minProbability: Number(form.minProbability) / 100, minFairOdds: Number(form.minFairOdds), maxFairOdds: Number(form.maxFairOdds) });
+      setSaved(new Date());
+    } catch (err) { setError(err.message); }
+  };
+
+  return (
+    <>
+      <h2>Recommendation thresholds</h2>
+      <p className="subtle">A selection is recommended only if it passes all of these. Changes apply to new analyses;
+        each past recommendation keeps the thresholds it was made with.</p>
+      <form className="card pad thresholds" onSubmit={save}>
+        <ErrorBanner error={error} />
+        <label>Minimum confidence
+          <select value={form.minConfidence} onChange={(e) => setForm({ ...form, minConfidence: e.target.value })}>
+            <option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option>
+          </select>
+        </label>
+        <label>Minimum probability (%)
+          <input type="number" min="1" max="99" step="1" value={form.minProbability}
+            onChange={(e) => setForm({ ...form, minProbability: e.target.value })} />
+        </label>
+        <label>Minimum fair odds
+          <input type="number" min="1" step="0.05" value={form.minFairOdds}
+            onChange={(e) => setForm({ ...form, minFairOdds: e.target.value })} />
+          <span className="subtle">Skips near-certainties: at fair odds of 1.30 or less, no price on offer is likely to be worth it.</span>
+        </label>
+        <label>Maximum fair odds
+          <input type="number" min="1.01" step="0.05" value={form.maxFairOdds}
+            onChange={(e) => setForm({ ...form, maxFairOdds: e.target.value })} />
+        </label>
+        <fieldset>
+          <legend>Markets</legend>
+          {markets.data.map((m) => (
+            <label key={m.key} className="check"><input type="checkbox" checked={enabled(m.key)} onChange={() => toggle(m.key)} /> {m.name}</label>
+          ))}
+        </fieldset>
+        <div><button className="primary" type="submit">Save thresholds</button>{saved && <span className="subtle"> Saved.</span>}</div>
+      </form>
+    </>
   );
 }

@@ -11,6 +11,7 @@ import Player from './pages/Player.jsx';
 import League from './pages/League.jsx';
 import Settings from './pages/Settings.jsx';
 import Later from './pages/Later.jsx';
+import Predictions from './pages/Predictions.jsx';
 import { Teams, Players, Leagues } from './pages/Lists.jsx';
 
 const NAV = [
@@ -81,7 +82,8 @@ function Routed({ page, props }) {
     case 'leagues': return <Leagues {...props} />;
     case 'league': return <League key={props.id} {...props} />;
     case 'settings': return <Settings {...props} />;
-    case 'predictions': case 'bets': case 'history': case 'performance': return <Later page={page} />;
+    case 'predictions': return <Predictions {...props} />;
+    case 'bets': case 'history': case 'performance': return <Later page={page} />;
     default: return <Dashboard {...props} />;
   }
 }

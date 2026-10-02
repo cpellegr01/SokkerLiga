@@ -18,6 +18,9 @@ import {
   listCompetitions, competitionDetail, setCompetitionEnabled, search, favourites, setFavourite,
 } from './queries.mjs';
 import { syncStatus, requestRun } from './jobs.mjs';
+import {
+  requestAnalysis, analysisForMatch, listPredictions, thresholdsFor, setThresholds, featureSnapshot,
+} from './analysis.mjs';
 import { VERSION } from '../src/version.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -98,6 +101,27 @@ async function handleApi(req, res, url) {
   if (m && method === 'GET') {
     const result = matchCenter(db, m[1]);
     return result ? send(res, 200, result) : notFound(res, 'match');
+  }
+
+  m = path.match(/^\/api\/matches\/(\d+)\/analysis$/);
+  if (m && method === 'GET') return send(res, 200, analysisForMatch(db, m[1]));
+  m = path.match(/^\/api\/matches\/(\d+)\/analyze$/);
+  if (m && method === 'POST') return send(res, 202, requestAnalysis(db, m[1], person.id));
+  m = path.match(/^\/api\/analysis-runs\/(\d+)\/snapshot$/);
+  if (m && method === 'GET') {
+    const snap = featureSnapshot(db, m[1]);
+    return snap ? send(res, 200, snap) : notFound(res, 'snapshot');
+  }
+
+  if (path === '/api/predictions' && method === 'GET') {
+    return send(res, 200, listPredictions(db, { ...q, includeSuperseded: q.includeSuperseded === '1' }));
+  }
+  if (path === '/api/settings/thresholds' && method === 'GET') return send(res, 200, thresholdsFor(db, person.id));
+  if (path === '/api/settings/thresholds' && method === 'PUT') {
+    return send(res, 200, setThresholds(db, person.id, await readJson(req)));
+  }
+  if (path === '/api/market-types' && method === 'GET') {
+    return send(res, 200, db.prepare('SELECT key, name, family, description FROM market_types ORDER BY ordinal').all());
   }
 
   if (path === '/api/teams' && method === 'GET') return send(res, 200, listTeams(db, q));

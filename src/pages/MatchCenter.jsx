@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import * as api from '../api.js';
+import Analysis from './Analysis.jsx';
 import { href } from '../router.js';
 import { longDate, kickoff, shortDate, ago, num, STATUS_LABEL } from '../format.js';
 import {
@@ -36,15 +37,7 @@ export default function MatchCenter({ id, params }) {
       {tab === 'h2h' && <HeadToHead data={data} />}
       {tab === 'lineups' && <Lineups data={data} />}
       {tab === 'players' && <Players data={data} />}
-      {tab === 'analysis' && (
-        <div className="card pad soon">
-          <h3>Analysis</h3>
-          <p className="subtle">
-            Analyze Match — the statistical model's probabilities, fair odds, factors for and against, and
-            Recommend / Pass — arrives in Phase 2.
-          </p>
-        </div>
-      )}
+      {tab === 'analysis' && <Analysis match={match} />}
     </Page>
   );
 }

@@ -292,3 +292,33 @@ table { border-collapse: collapse; width: 100%; }
   .star-label { display: none; }
 }
 .data.sync button { white-space: nowrap; }
+
+/* ------------------------------------------------------------ analysis */
+
+button.primary { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); font-weight: 600; }
+.run-header { display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+.run-header p { margin: 0.2rem 0; }
+.run-actions { display: flex; flex-direction: column; align-items: flex-end; gap: 0.35rem; }
+.pick-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 0.75rem; }
+.pick { border: 1px solid var(--border); border-radius: 8px; padding: 0.75rem; background: var(--surface-2); }
+.pick-title { font-weight: 700; }
+.pick-numbers { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin: 0.4rem 0; }
+.pick-factors { display: flex; flex-direction: column; gap: 0.25rem; margin-top: 0.4rem; }
+.factor.for { color: var(--win); }
+.factor.against { color: var(--loss); }
+.factor strong { color: var(--fg); }
+.factors { margin: 0.25rem 0 0.5rem; padding-left: 1.1rem; }
+.factors li { margin: 0.2rem 0; }
+.section-toggle { display: flex; justify-content: space-between; align-items: center; padding-bottom: 0.75rem; }
+.section-toggle h3 { margin: 0; }
+.group-row td { background: var(--surface-2); font-weight: 600; }
+.pill.conf-high, .pill.stance-support { background: var(--accent-soft); color: var(--accent); }
+.pill.conf-medium, .pill.stance-caution { background: var(--warn-bg); color: var(--warn-fg); }
+.pill.conf-low, .pill.stance-oppose { background: var(--danger-bg); color: var(--danger-fg); }
+.rec-row { display: flex; flex-direction: column; gap: 0.15rem; padding: 0.55rem 1rem; border-top: 1px solid var(--border); color: var(--fg); }
+.rec-row:first-child { border-top: none; }
+.rec-row:hover { background: var(--surface-2); text-decoration: none; }
+.thresholds { display: grid; gap: 0.75rem; max-width: 520px; }
+.thresholds label { display: flex; flex-direction: column; gap: 0.25rem; }
+.thresholds label.check { flex-direction: row; align-items: center; }
+.thresholds fieldset { border: 1px solid var(--border); border-radius: 8px; display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 0.35rem; }

@@ -1,0 +1,8 @@
+[
+  { "key": "dixon-coles", "version": "1", "name": "Dixon–Coles goals model", "kind": "statistical",
+    "description": "Poisson goals with a low-score correction; attack and defence ratings per team with one-year half-life time decay, home advantage per competition, shrinkage toward average for thin samples. Corners and cards from negative-binomial rate models.",
+    "params_json": "{\"half_life_days\":365,\"history_days\":1100,\"shrinkage_matches\":3,\"max_goals\":10}" },
+  { "key": "claude-explainer", "version": "1", "name": "Claude match explainer", "kind": "llm",
+    "description": "Claude reads the match packet and the model's probabilities, names factors for and against, and flags data gaps. It does not set probabilities.",
+    "params_json": "{\"model\":\"claude-opus-5-5\",\"effort\":\"medium\"}" }
+]

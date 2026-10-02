@@ -9,6 +9,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { readFileSync, mkdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { promptRecord } from './ai/claude.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const SEED_DIR = join(HERE, 'seed');
@@ -31,6 +32,7 @@ const SEEDS = [
   ['competitions.json', 'competitions', 'key',
     ['name', 'country_code', 'country_name', 'kind', 'ordinal', 'api_football_id'], ['is_enabled']],
   ['jobs.json', 'jobs', 'key', ['name', 'description', 'interval_minutes', 'ordinal'], []],
+  ['market-types.json', 'market_types', 'key', ['name', 'family', 'has_line', 'description', 'ordinal'], []],
 ];
 
 const DEFAULT_SETTINGS = {
@@ -69,11 +71,35 @@ function loadMasterData(db) {
       );
       for (const row of rows) insert.run(...columns.map((c) => row[c] ?? null));
     }
+    /* Models are keyed by (key, version): a new version is a new row and an
+     * old one is never rewritten, so past runs keep pointing at what ran. */
+    const model = db.prepare(`INSERT INTO models (key, version, name, kind, description, params_json)
+                              VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(key, version) DO NOTHING`);
+    for (const m of JSON.parse(readFileSync(join(SEED_DIR, 'models.json'), 'utf8'))) {
+      model.run(m.key, m.version, m.name, m.kind, m.description, m.params_json);
+    }
+    registerPrompt(db, now);
+
     const setting = db.prepare(
       'INSERT INTO settings (key, value, updated_at) VALUES (?, ?, ?) ON CONFLICT(key) DO NOTHING',
     );
     for (const [k, v] of Object.entries(DEFAULT_SETTINGS)) setting.run(k, v, now);
   });
+}
+
+/* The prompt file is stored by version with its checksum. Editing the text
+ * without bumping its version would make past analyses claim a prompt they
+ * were not given, so that stops the start-up with an explanation. */
+function registerPrompt(db, now) {
+  const p = promptRecord();
+  const existing = db.prepare('SELECT sha256 FROM prompts WHERE key = ? AND version = ?').get(p.key, p.version);
+  if (!existing) {
+    db.prepare('INSERT INTO prompts (key, version, body, sha256, created_at) VALUES (?, ?, ?, ?, ?)')
+      .run(p.key, p.version, p.body, p.sha256, now);
+  } else if (existing.sha256 !== p.sha256) {
+    throw new Error(`The prompt ${p.key} v${p.version} was edited after use. Save the change as a new version `
+      + '(a new file and PROMPT_VERSION in server/ai/claude.mjs) instead.');
+  }
 }
 
 export function getSetting(db, key) {

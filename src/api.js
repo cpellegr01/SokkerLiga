@@ -36,3 +36,12 @@ export const setFavourite = (type, id, on) =>
   request(`/favourites/${type}/${id}`, { method: on ? 'PUT' : 'DELETE' });
 export const getSync = () => request('/sync');
 export const runJob = (key) => request(`/sync/${key}/run`, { method: 'POST' });
+
+/* Analysis and predictions */
+export const getAnalysis = (matchId) => request(`/matches/${matchId}/analysis`);
+export const analyze = (matchId) => request(`/matches/${matchId}/analyze`, { method: 'POST' });
+export const getSnapshot = (runId) => request(`/analysis-runs/${runId}/snapshot`);
+export const listPredictions = (params = {}) => request(`/predictions${query(params)}`);
+export const getThresholds = () => request('/settings/thresholds');
+export const setThresholds = (t) => request('/settings/thresholds', { method: 'PUT', body: JSON.stringify(t) });
+export const listMarketTypes = () => request('/market-types');

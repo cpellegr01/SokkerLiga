@@ -435,3 +435,217 @@ CREATE TABLE IF NOT EXISTS settings (
   value      TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
+
+-- =================================================================
+-- Phase 2: markets, analysis runs, predictions, recommendations.
+-- Design: docs/architecture.md §2 "Predictions" and §6.
+--
+-- Predictions are evidence. Once written they cannot be changed or
+-- deleted (triggers below), and none can be written for a match that has
+-- kicked off. Re-analysing before kickoff writes new rows and marks the old
+-- ones superseded; nothing is overwritten.
+-- =================================================================
+
+-- What can be predicted: '1X2', 'Over/Under goals', 'Asian handicap'...
+CREATE TABLE IF NOT EXISTS market_types (
+  key         TEXT PRIMARY KEY,
+  name        TEXT NOT NULL,
+  family      TEXT NOT NULL,            -- goals / corners / cards
+  has_line    INTEGER NOT NULL DEFAULT 0,
+  description TEXT NOT NULL DEFAULT '',
+  ordinal     INTEGER NOT NULL
+);
+
+-- One question about one match ('over/under 2.5 goals in Arsenal v Spurs').
+CREATE TABLE IF NOT EXISTS markets (
+  id              INTEGER PRIMARY KEY,
+  match_id        INTEGER NOT NULL REFERENCES matches(id),
+  market_type_key TEXT NOT NULL REFERENCES market_types(key),
+  line            REAL,                  -- NULL for markets without a line
+  UNIQUE (match_id, market_type_key, line)
+);
+
+CREATE TABLE IF NOT EXISTS selections (
+  id        INTEGER PRIMARY KEY,
+  market_id INTEGER NOT NULL REFERENCES markets(id),
+  key       TEXT NOT NULL,               -- home / draw / away / over / under / yes / no / home_draw ...
+  UNIQUE (market_id, key)
+);
+
+-- The engines and their versions: the statistical model, the explainer.
+CREATE TABLE IF NOT EXISTS models (
+  key         TEXT NOT NULL,
+  version     TEXT NOT NULL,
+  name        TEXT NOT NULL,
+  kind        TEXT NOT NULL,             -- statistical / llm
+  description TEXT NOT NULL DEFAULT '',
+  params_json TEXT NOT NULL DEFAULT '{}',
+  PRIMARY KEY (key, version)
+);
+
+-- Prompt text is versioned data: a changed prompt is a new version.
+CREATE TABLE IF NOT EXISTS prompts (
+  key        TEXT NOT NULL,
+  version    TEXT NOT NULL,
+  body       TEXT NOT NULL,
+  sha256     TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (key, version)
+);
+
+-- Exactly what the model and Claude were given, so any prediction can be
+-- reconstructed and audited later.
+CREATE TABLE IF NOT EXISTS feature_snapshots (
+  id                  INTEGER PRIMARY KEY,
+  match_id            INTEGER NOT NULL REFERENCES matches(id),
+  as_of               TEXT NOT NULL,
+  builder_version     TEXT NOT NULL,
+  features_json       TEXT NOT NULL,
+  data_freshness_json TEXT NOT NULL,
+  sha256              TEXT NOT NULL,
+  created_at          TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS feature_snapshots_match_idx ON feature_snapshots(match_id, as_of);
+
+CREATE TABLE IF NOT EXISTS analysis_runs (
+  id                  INTEGER PRIMARY KEY,
+  match_id            INTEGER NOT NULL REFERENCES matches(id),
+  requested_by        TEXT,
+  requested_at        TEXT NOT NULL,
+  started_at          TEXT,
+  completed_at        TEXT,
+  status              TEXT NOT NULL DEFAULT 'queued', -- queued / running / completed / failed
+  as_of               TEXT,
+  feature_snapshot_id INTEGER REFERENCES feature_snapshots(id),
+  prob_model_key      TEXT,
+  prob_model_version  TEXT,
+  ai_model            TEXT,
+  prompt_key          TEXT,
+  prompt_version      TEXT,
+  ai_status           TEXT,             -- explained / skipped / failed / refused
+  ai_error            TEXT,
+  input_tokens        INTEGER,
+  output_tokens       INTEGER,
+  cost_cents          REAL,
+  error               TEXT
+);
+CREATE INDEX IF NOT EXISTS analysis_runs_match_idx ON analysis_runs(match_id, requested_at);
+CREATE INDEX IF NOT EXISTS analysis_runs_status_idx ON analysis_runs(status);
+
+CREATE TABLE IF NOT EXISTS predictions (
+  id                     INTEGER PRIMARY KEY,
+  analysis_run_id        INTEGER NOT NULL REFERENCES analysis_runs(id),
+  match_id               INTEGER NOT NULL REFERENCES matches(id),
+  selection_id           INTEGER NOT NULL REFERENCES selections(id),
+  model_probability      REAL NOT NULL,
+  calibrated_probability REAL,          -- Phase 4
+  fair_odds              REAL NOT NULL,  -- 1 / probability
+  confidence_score       REAL NOT NULL,  -- 0..1
+  confidence_band        TEXT NOT NULL,  -- low / medium / high
+  created_at             TEXT NOT NULL,
+  superseded_by          INTEGER REFERENCES predictions(id)
+);
+CREATE INDEX IF NOT EXISTS predictions_match_idx ON predictions(match_id, created_at);
+CREATE INDEX IF NOT EXISTS predictions_run_idx ON predictions(analysis_run_id);
+
+CREATE TABLE IF NOT EXISTS prediction_factors (
+  id            INTEGER PRIMARY KEY,
+  prediction_id INTEGER NOT NULL REFERENCES predictions(id),
+  direction     TEXT NOT NULL CHECK (direction IN ('for', 'against')),
+  label         TEXT NOT NULL,
+  evidence      TEXT,
+  source        TEXT NOT NULL DEFAULT 'ai'   -- ai / model
+);
+CREATE INDEX IF NOT EXISTS prediction_factors_prediction_idx ON prediction_factors(prediction_id);
+
+CREATE TABLE IF NOT EXISTS recommendations (
+  id                INTEGER PRIMARY KEY,
+  analysis_run_id   INTEGER NOT NULL REFERENCES analysis_runs(id),
+  prediction_id     INTEGER NOT NULL REFERENCES predictions(id),
+  decision          TEXT NOT NULL CHECK (decision IN ('recommend', 'pass')),
+  pass_reasons_json TEXT NOT NULL DEFAULT '[]',
+  thresholds_json   TEXT NOT NULL,       -- the thresholds in force when decided
+  ai_stance         TEXT,                -- support / caution / oppose, when Claude reviewed it
+  reasoning_summary TEXT,
+  created_at        TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS recommendations_run_idx ON recommendations(analysis_run_id);
+
+CREATE TABLE IF NOT EXISTS ai_explanations (
+  analysis_run_id INTEGER PRIMARY KEY REFERENCES analysis_runs(id),
+  summary         TEXT NOT NULL,
+  narrative       TEXT NOT NULL,
+  key_factors_json TEXT NOT NULL DEFAULT '[]',
+  data_gaps_json  TEXT NOT NULL DEFAULT '[]',
+  created_at      TEXT NOT NULL
+);
+
+-- Dated rows: the thresholds in force at any moment can be read back.
+CREATE TABLE IF NOT EXISTS recommendation_thresholds (
+  id               INTEGER PRIMARY KEY,
+  user_id          TEXT NOT NULL,
+  min_confidence   TEXT NOT NULL DEFAULT 'medium',  -- low / medium / high
+  min_probability  REAL NOT NULL DEFAULT 0.55,
+  min_fair_odds    REAL NOT NULL DEFAULT 1.3,   -- near-certainties are worth nothing at any price on offer
+  max_fair_odds    REAL NOT NULL DEFAULT 2.5,
+  markets_json     TEXT NOT NULL DEFAULT '[]',      -- enabled market type keys; [] = all
+  effective_from   TEXT NOT NULL
+);
+
+-- ----------------------------------------------- immutability triggers
+
+CREATE TRIGGER IF NOT EXISTS predictions_no_late_insert
+BEFORE INSERT ON predictions
+WHEN (SELECT kickoff_utc FROM matches WHERE id = NEW.match_id) <= NEW.created_at
+BEGIN
+  SELECT RAISE(ABORT, 'Predictions cannot be made after kickoff.');
+END;
+
+CREATE TRIGGER IF NOT EXISTS predictions_immutable
+BEFORE UPDATE ON predictions
+WHEN NOT (
+  -- the only permitted change: marking a prediction superseded, before kickoff
+  OLD.superseded_by IS NULL AND NEW.superseded_by IS NOT NULL
+  AND NEW.analysis_run_id IS OLD.analysis_run_id AND NEW.match_id IS OLD.match_id
+  AND NEW.selection_id IS OLD.selection_id AND NEW.model_probability IS OLD.model_probability
+  AND NEW.calibrated_probability IS OLD.calibrated_probability AND NEW.fair_odds IS OLD.fair_odds
+  AND NEW.confidence_score IS OLD.confidence_score AND NEW.confidence_band IS OLD.confidence_band
+  AND NEW.created_at IS OLD.created_at
+  AND (SELECT kickoff_utc FROM matches WHERE id = OLD.match_id) > strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+)
+BEGIN
+  SELECT RAISE(ABORT, 'Predictions cannot be changed once made.');
+END;
+
+CREATE TRIGGER IF NOT EXISTS predictions_no_delete BEFORE DELETE ON predictions
+BEGIN SELECT RAISE(ABORT, 'Predictions cannot be deleted.'); END;
+
+CREATE TRIGGER IF NOT EXISTS prediction_factors_immutable BEFORE UPDATE ON prediction_factors
+BEGIN SELECT RAISE(ABORT, 'Prediction factors cannot be changed once made.'); END;
+CREATE TRIGGER IF NOT EXISTS prediction_factors_no_delete BEFORE DELETE ON prediction_factors
+BEGIN SELECT RAISE(ABORT, 'Prediction factors cannot be deleted.'); END;
+
+CREATE TRIGGER IF NOT EXISTS recommendations_immutable BEFORE UPDATE ON recommendations
+BEGIN SELECT RAISE(ABORT, 'Recommendations cannot be changed once made.'); END;
+CREATE TRIGGER IF NOT EXISTS recommendations_no_delete BEFORE DELETE ON recommendations
+BEGIN SELECT RAISE(ABORT, 'Recommendations cannot be deleted.'); END;
+
+CREATE TRIGGER IF NOT EXISTS feature_snapshots_immutable BEFORE UPDATE ON feature_snapshots
+BEGIN SELECT RAISE(ABORT, 'Feature snapshots cannot be changed once made.'); END;
+CREATE TRIGGER IF NOT EXISTS feature_snapshots_no_delete BEFORE DELETE ON feature_snapshots
+BEGIN SELECT RAISE(ABORT, 'Feature snapshots cannot be deleted.'); END;
+
+CREATE TRIGGER IF NOT EXISTS ai_explanations_immutable BEFORE UPDATE ON ai_explanations
+BEGIN SELECT RAISE(ABORT, 'Explanations cannot be changed once made.'); END;
+CREATE TRIGGER IF NOT EXISTS ai_explanations_no_delete BEFORE DELETE ON ai_explanations
+BEGIN SELECT RAISE(ABORT, 'Explanations cannot be deleted.'); END;
+
+-- A completed run's record of what produced it is fixed.
+CREATE TRIGGER IF NOT EXISTS analysis_runs_completed_immutable
+BEFORE UPDATE ON analysis_runs
+WHEN OLD.status IN ('completed', 'failed')
+BEGIN
+  SELECT RAISE(ABORT, 'A finished analysis run cannot be changed.');
+END;
+CREATE TRIGGER IF NOT EXISTS analysis_runs_no_delete BEFORE DELETE ON analysis_runs
+BEGIN SELECT RAISE(ABORT, 'Analysis runs cannot be deleted.'); END;

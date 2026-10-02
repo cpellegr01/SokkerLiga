@@ -44,12 +44,29 @@ export default function Dashboard() {
               ? data.recentResults.map((m) => <MatchRow key={m.id} match={m} showDay showCompetition />)
               : <p className="subtle pad">No results in the last three days.</p>}
           </div>
-          <div className="card pad soon">
-            <h3>Recommendations</h3>
-            <p className="subtle">Match analysis, predictions and recommendations arrive in Phase 2.</p>
-          </div>
+          <h2>Recommendations</h2>
+          <TopRecommendations />
         </aside>
       </div>
     </Page>
+  );
+}
+
+function TopRecommendations() {
+  const { data } = useApi(() => api.listPredictions({ decision: 'recommend', from: new Date().toISOString(), limit: 200 }), []);
+  if (!data) return null;
+  /* One per match: its most likely recommended selection. */
+  const best = new Map();
+  for (const p of data) if (!best.has(p.matchId) || p.probability > best.get(p.matchId).probability) best.set(p.matchId, p);
+  const picks = [...best.values()].sort((a, b) => a.kickoffUtc.localeCompare(b.kickoffUtc)).slice(0, 8);
+  return (
+    <div className="card">
+      {picks.length ? picks.map((p) => (
+        <a key={p.id} className="rec-row" href={href('match', p.matchId, { tab: 'analysis' })}>
+          <span className="subtle">{p.home} v {p.away}</span>
+          <span><strong>{p.label}</strong> · {(p.probability * 100).toFixed(0)}% · fair {p.fairOdds.toFixed(2)}</span>
+        </a>
+      )) : <p className="subtle pad">No upcoming recommendations yet. Open a match and analyse it.</p>}
+    </div>
   );
 }

@@ -30,6 +30,32 @@ data can reference people by id.
   computed **as of its kickoff**.
 - `src/` — hash-routed React UI (`#/match/12`), pages in `src/pages/`.
 
+## Code map (Phase 2 — analysis)
+
+- `server/features.mjs` — `buildFeatures(db, matchId, asOf)`: the ONLY door
+  to data for prediction. Results count only if kicked off ≥3 h before asOf;
+  corrections after asOf are undone via `match_revisions`; the table is
+  rebuilt from results; injuries/lineups count only if fetched by asOf.
+  `test/analysis.test.mjs` "No look-ahead" guards this — keep it green.
+- `server/model/goals.mjs` — Dixon–Coles fit (time decay, shrinkage, per-
+  competition home advantage, ρ by grid). `server/model/markets.mjs` — every
+  goals market priced from the scoreline matrix; corners/cards by negative
+  binomial.
+- `server/analysis.mjs` — request → run: snapshot, predictions (written
+  BEFORE Claude is asked), explanation, recommendations with the thresholds
+  copied in. Predictions/recommendations/snapshots/explanations are
+  append-only by SQLite triggers; re-analysis marks old predictions
+  superseded (the only allowed update, before kickoff only).
+- `server/ai/claude.mjs` — Claude Opus 5.5, effort `medium` set explicitly,
+  structured output (`output_config.format` json_schema), `fallbacks:
+  "default"` (beta `server-side-fallback-2026-07-01`), refusal checked before
+  parsing. Claude explains; it never sets probabilities.
+- Prompts are versioned files `server/prompts/<key>.v<N>.md`; editing one
+  without a new version stops start-up (checksum in the `prompts` table).
+- Thresholds: dated rows per user; defaults medium confidence, p ≥ 55%,
+  fair odds 1.30–2.50 (the minimum keeps near-certainties out).
+- `src/markets.js` — selection labels, shared by server and UI.
+
 Deviations from `docs/architecture.md`, deliberately small: no `stages`
 table (round text on matches, group name on standings); logos/photos are
 columns rather than an `images` table; `ingest.mjs`/`jobs.mjs` are single
