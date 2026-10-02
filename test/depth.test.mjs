@@ -280,3 +280,17 @@ describe('Contracts with a limit price', () => {
       legs: [{ matchId: league.upcomingId, market: 'btts', selection: 'no', odds: '' }] }), /needs the number of contracts/);
   });
 });
+
+describe('Commissions', () => {
+  test('commissions and fees both come off profit; total cost adds them up', () => {
+    saveSportsbook(db, { name: 'Robinhood', currency: 'USD' });
+    const past = league.matchIds[62];
+    const m = db.prepare('SELECT kickoff_utc, home_goals, away_goals FROM matches WHERE id = ?').get(past);
+    const won = m.home_goals > m.away_goals ? 'home' : m.home_goals < m.away_goals ? 'away' : 'draw';
+    const bet = createBet(db, 'u1', { sportsbook: 'robinhood', stake: '9.52', commission: '0.14', fee: '0.14', contracts: '14', limitPrice: '68',
+      placedAt: new Date(Date.parse(m.kickoff_utc) - 3600_000).toISOString(),
+      legs: [{ matchId: past, market: 'match_result', selection: won, odds: '' }] });
+    assert.equal(bet.totalCostMinor, 980);
+    assert.equal(bet.profitMinor, 1400 - 980);
+  });
+});

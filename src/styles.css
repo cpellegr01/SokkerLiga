@@ -522,3 +522,7 @@ textarea { padding: 0.45rem 0.6rem; border: 1px solid var(--border); border-radi
 .suggested { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
 .closing-form { display: flex; gap: 0.4rem; align-items: center; flex-wrap: wrap; }
 .closing-form input { width: 7rem; }
+.order-summary { border: 1px solid var(--border); border-radius: 8px; padding: 0.6rem 0.75rem; display: flex; flex-direction: column; gap: 0.3rem; background: var(--surface-2); }
+.order-summary > div { display: flex; justify-content: space-between; gap: 0.75rem; }
+.order-summary > div > span:last-child { text-align: right; font-variant-numeric: tabular-nums; }
+.order-total { border-top: 1px solid var(--border); padding-top: 0.35rem; }

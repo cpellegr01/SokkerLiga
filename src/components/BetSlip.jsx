@@ -18,7 +18,7 @@ const STORE = 'sokkerliga.betslip';
 const load = () => {
   try { return JSON.parse(localStorage.getItem(STORE)) ?? null; } catch { return null; }
 };
-const emptyDraft = () => ({ editingId: null, legs: [], stake: '', fee: '', byContracts: false, contracts: '', limitPrice: '', stakeAuto: false, sportsbook: '', placedAt: '', totalOdds: '', notes: '' });
+const emptyDraft = () => ({ editingId: null, legs: [], stake: '', fee: '', byContracts: false, contracts: '', limitPrice: '', commission: '', stakeAuto: false, sportsbook: '', placedAt: '', totalOdds: '', notes: '' });
 
 export function BetSlipProvider({ children }) {
   const [draft, setDraft] = useState(() => load() ?? emptyDraft());
@@ -42,6 +42,7 @@ export function BetSlipProvider({ children }) {
     edit(bet) {
       setDraft({
         editingId: bet.id, stake: (bet.stakeMinor / 100).toFixed(2), fee: bet.feeMinor ? (bet.feeMinor / 100).toFixed(2) : '',
+        commission: bet.commissionMinor ? (bet.commissionMinor / 100).toFixed(2) : '',
         byContracts: !!bet.contracts, contracts: bet.contracts ? String(bet.contracts) : '',
         limitPrice: bet.limitPrice ? String(Math.round(bet.limitPrice * 10000) / 100) : '', stakeAuto: false,
         sportsbook: bet.sportsbook.key,
@@ -113,7 +114,8 @@ function SlipDrawer() {
   const hasContracts = contracts > 0;
   const limit = contractMode ? parseContractPrice(draft.limitPrice) : null;
   const payout = hasContracts ? Math.round(contracts * 100) : total && stakeMinor ? Math.round(stakeMinor * total) : null;
-  const feeMinor = parseMoney(draft.fee) ?? 0;
+  const commissionMinor = contractMode ? parseMoney(draft.commission) ?? 0 : 0;
+  const feeMinor = (parseMoney(draft.fee) ?? 0) + commissionMinor;
   const contractCost = hasContracts && limit ? Math.round(contracts * limit * 100) : null;
   const fillCents = hasContracts && stakeMinor ? Number((stakeMinor / contracts).toFixed(2)) : null;
   useEffect(() => {
@@ -133,7 +135,8 @@ function SlipDrawer() {
     setSaving(true);
     const body = {
       sportsbook: draft.sportsbook, stake: draft.stake, fee: draft.fee,
-      contracts: contractMode ? draft.contracts : '', limitPrice: contractMode ? draft.limitPrice : '', totalOdds: draft.legs.length > 1 ? draft.totalOdds : '',
+      contracts: contractMode ? draft.contracts : '', limitPrice: contractMode ? draft.limitPrice : '',
+      commission: contractMode ? draft.commission : '', totalOdds: draft.legs.length > 1 ? draft.totalOdds : '',
       placedAt: draft.placedAt ? new Date(draft.placedAt).toISOString() : undefined, notes: draft.notes,
       legs: draft.legs.map((l) => ({ matchId: l.matchId, market: l.market, line: l.line, selection: l.selection,
         odds: contractMode ? '' : l.odds,
@@ -205,23 +208,36 @@ function SlipDrawer() {
                 </label>
               )}
               {contractMode && (
-                <div className="slip-row">
-                  <label className="slip-field">Contracts
-                    <input value={draft.contracts} inputMode="decimal" placeholder="e.g. 14" onChange={(e) => set({ contracts: e.target.value })} />
-                  </label>
-                  <label className="slip-field">Limit price
-                    <input value={draft.limitPrice ?? ''} inputMode="decimal" placeholder="e.g. 68" onChange={(e) => set({ limitPrice: e.target.value })} />
-                    <span className="subtle">In cents, as on the order: 68 for 68¢.</span>
-                  </label>
-                </div>
+                <>
+                  <div className="slip-row">
+                    <label className="slip-field">Contracts
+                      <input value={draft.contracts} inputMode="decimal" placeholder="e.g. 14" onChange={(e) => set({ contracts: e.target.value })} />
+                    </label>
+                    <label className="slip-field">Limit price
+                      <input value={draft.limitPrice ?? ''} inputMode="decimal" placeholder="e.g. 68" onChange={(e) => set({ limitPrice: e.target.value })} />
+                      <span className="subtle">In cents, as on the order: 68 for 68¢.</span>
+                    </label>
+                  </div>
+                  <div className="slip-row">
+                    <label className="slip-field">Filled notional ({currency})
+                      <input value={draft.stake} inputMode="decimal" placeholder="9.52" onChange={(e) => set({ stake: e.target.value, stakeAuto: false })} />
+                      <span className="subtle">What the contracts cost. Filled in from the limit; change it if the order filled lower.</span>
+                    </label>
+                    <label className="slip-field">Commissions
+                      <input value={draft.commission ?? ''} inputMode="decimal" placeholder="0.00" onChange={(e) => set({ commission: e.target.value })} />
+                    </label>
+                    <label className="slip-field">Fees
+                      <input value={draft.fee} inputMode="decimal" placeholder="0.00" onChange={(e) => set({ fee: e.target.value })} />
+                    </label>
+                  </div>
+                  <OrderSummary contracts={hasContracts ? contracts : null} limit={limit} notional={stakeMinor} commission={commissionMinor}
+                    fees={parseMoney(draft.fee) ?? 0} fillCents={fillCents} currency={currency} />
+                </>
               )}
-              <div className="slip-row">
+              {!contractMode && <div className="slip-row">
                 <label className="slip-field">Bet ({currency})
                   <input value={draft.stake} inputMode="decimal" placeholder="10.00" onChange={(e) => set({ stake: e.target.value, stakeAuto: false })} />
-                  <span className="subtle">{contractMode
-                    ? `What the contracts cost${contractCost ? ` — filled in as ${contracts} × ${formatMoney(Math.round(contractCost / contracts), currency)}` : ''}. If the order filled below the limit, type what you actually paid.`
-                    : 'The amount you put on the bet — what you lose if it loses.'}</span>
-                  {contractMode && fillCents && <span className="subtle">You paid {fillCents}¢ per contract.</span>}
+                  <span className="subtle">The amount you put on the bet — what you lose if it loses.</span>
                   {payout && (
                     <span className="subtle">
                       If it wins you get {formatMoney(payout, currency)} back: your {formatMoney(stakeMinor, currency)} plus{' '}
@@ -247,6 +263,8 @@ function SlipDrawer() {
                   <input value={draft.fee} inputMode="decimal" placeholder="0.00" onChange={(e) => set({ fee: e.target.value })} />
                   <span className="subtle">Any fee the app charged on top of the bet. It is counted as spent whatever the result.</span>
                 </label>
+              </div>}
+              <div className="slip-row">
                 <label className="slip-field">Betting app
                   {books && books.length ? (
                     <select value={draft.sportsbook} onChange={(e) => set({ sportsbook: e.target.value })}>
@@ -300,6 +318,30 @@ function OddsHint({ text, onUse }) {
     <span className="danger">{h.message}
       {h.suggestion && <> <button type="button" className="link-button" onClick={() => onUse(h.suggestion)}>Use {h.suggestion}</button></>}
     </span>
+  );
+}
+
+/* A contract order laid out as the app shows it. */
+function OrderSummary({ contracts, limit, notional, commission, fees, fillCents, currency }) {
+  const m = (x) => formatMoney(x, currency);
+  const total = (notional ?? 0) + commission + fees;
+  const rows = [
+    ['Contracts', contracts ?? '—'],
+    ['Limit price', limit ? `${Math.round(limit * 10000) / 100}¢` : '—'],
+    ['Cost at the limit', contracts && limit ? `${contracts} × ${Math.round(limit * 10000) / 100}¢ = ${m(Math.round(contracts * limit * 100))}` : '—'],
+    ['Filled notional', notional ? `${m(notional)}${fillCents ? ` (${fillCents}¢ a contract)` : ''}` : '—'],
+    ['Commissions', m(commission)],
+    ['Fees', m(fees)],
+  ];
+  return (
+    <div className="order-summary">
+      {rows.map(([k, v]) => <div key={k}><span className="subtle">{k}</span><span>{v}</span></div>)}
+      <div className="order-total"><span>Total cost</span><span>{notional ? m(total) : '—'}</span></div>
+      {contracts && notional ? (
+        <div><span className="subtle">Pays if it wins</span>
+          <span>{m(Math.round(contracts * 100))} · profit <span className={contracts * 100 - total > 0 ? 'profit-up' : 'profit-down'}>{m(Math.round(contracts * 100) - total)}</span></span></div>
+      ) : null}
+    </div>
   );
 }
 

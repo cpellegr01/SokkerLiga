@@ -42,9 +42,15 @@ function BetCard({ bet, onChanged }) {
           <div className="subtle">Placed {longDate(bet.placedAt)}</div>
         </div>
         <div className="bet-figures">
-          <span>Bet {formatMoney(bet.stakeMinor, bet.currency)}</span>
-          {bet.contracts && <span>{bet.contracts} contract{bet.contracts === 1 ? '' : 's'}</span>}
+          {bet.contracts ? (
+            <>
+              <span>{bet.contracts} contract{bet.contracts === 1 ? '' : 's'}{bet.limitPrice ? ` · limit ${Math.round(bet.limitPrice * 10000) / 100}¢` : ''}</span>
+              <span>Filled notional {formatMoney(bet.stakeMinor, bet.currency)}</span>
+              {bet.commissionMinor > 0 && <span>Commissions {formatMoney(bet.commissionMinor, bet.currency)}</span>}
+            </>
+          ) : <span>Bet {formatMoney(bet.stakeMinor, bet.currency)}</span>}
           {bet.feeMinor > 0 && <span>Fees {formatMoney(bet.feeMinor, bet.currency)}</span>}
+          {bet.totalCostMinor !== bet.stakeMinor && <span>Total cost {formatMoney(bet.totalCostMinor, bet.currency)}</span>}
           <span>Odds {bet.totalOdds.toFixed(2)}</span>
           {bet.outcome === 'pending'
             ? <span>Returns {formatMoney(bet.potentialPayoutMinor, bet.currency)}</span>
