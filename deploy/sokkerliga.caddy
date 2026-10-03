@@ -4,7 +4,7 @@
 # conforza-home repo) imports it and defines the conforza_auth and
 # conforza_headers snippets used here. Then: systemctl reload caddy
 
-sokkerliga.conforza.tech {
+sokkerliga.conforza.us {
 	encode zstd gzip
 
 	# The health probe is open, so a deploy can be verified without an account.
@@ -35,4 +35,9 @@ sokkerliga.conforza.tech {
 			roll_keep 5
 		}
 	}
+}
+
+# The old address (until 2026-10-03) redirects, path and all.
+sokkerliga.conforza.tech {
+	redir https://sokkerliga.conforza.us{uri} permanent
 }
