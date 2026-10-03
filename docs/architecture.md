@@ -587,7 +587,7 @@ initials badge as fallback.
 
 ## 9. Roadmap
 
-Each phase ends deployed and verified at sokkerliga.conforza.tech.
+Each phase ends deployed and verified at sokkerliga.conforza.us.
 
 **Phase 0 — groundwork**
 - Claudio: API-Football Pro account; Anthropic key. Both go into

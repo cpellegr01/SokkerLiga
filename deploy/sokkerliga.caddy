@@ -36,8 +36,3 @@ sokkerliga.conforza.us {
 		}
 	}
 }
-
-# The old address (until 2026-10-03) redirects, path and all.
-sokkerliga.conforza.tech {
-	redir https://sokkerliga.conforza.us{uri} permanent
-}

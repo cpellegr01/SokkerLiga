@@ -1,6 +1,6 @@
 # SokkerLiga
 
-Third app on the Conforza server, at https://sokkerliga.conforza.tech.
+Third app on the Conforza server, at https://sokkerliga.conforza.us.
 Stack matches SAM: Node 22 + Vite + React + SQLite (`node:sqlite`), no server
 runtime dependencies.
 
