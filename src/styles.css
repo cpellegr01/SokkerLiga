@@ -629,3 +629,12 @@ input.auto { color: var(--muted); }
 .bracket-slot.out-line::after { content: ''; position: absolute; right: -1rem; top: 50%; width: 1rem;
   border-top: 0.5px solid color-mix(in srgb, var(--muted) 45%, var(--border)); }
 .bracket-slot.fed::before { width: 1rem; }
+/* The status column is the same width on every row, so the teams and the
+ * score line up down the list whatever badge a row shows (Half-time,
+ * Full time, 48′, nothing). */
+.match-row { grid-template-columns: 4.5rem minmax(0, 1fr) 4rem minmax(0, 1fr) 9rem; }
+.match-meta { overflow: hidden; }
+.match-meta .subtle { overflow: hidden; text-overflow: ellipsis; }
+@media (max-width: 720px) {
+  .match-row { grid-template-columns: 3.2rem minmax(0, 1fr) 3rem minmax(0, 1fr); }
+}
