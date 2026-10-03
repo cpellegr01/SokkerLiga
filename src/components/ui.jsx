@@ -82,7 +82,7 @@ export function FormStrip({ form }) {
 
 export function StatusPill({ match }) {
   if (match.status === 'live') {
-    return <span className="pill live">{match.statusDetail === 'HT' ? 'HT' : `${match.elapsed ?? ''}′`}</span>;
+    return <span className="pill live">{match.statusDetail === 'HT' ? 'Half-time' : `${match.elapsed ?? ''}′`}</span>;
   }
   if (match.status === 'scheduled') return null;
   return <span className={`pill ${match.status}`}>{STATUS_LABEL[match.status] ?? match.status}</span>;

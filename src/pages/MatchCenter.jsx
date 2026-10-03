@@ -62,7 +62,7 @@ function MatchHeader({ data }) {
           {played ? (
             <>
               <span className="big-score">{match.score.home} – {match.score.away}</span>
-              {match.score.homeHt !== null && <span className="subtle">HT {match.score.homeHt}–{match.score.awayHt}</span>}
+              {match.score.homeHt !== null && <span className="subtle">Half-time {match.score.homeHt}–{match.score.awayHt}</span>}
               {match.score.homePens !== null && <span className="subtle">Pens {match.score.homePens}–{match.score.awayPens}</span>}
               <StatusPill match={match} />
             </>
